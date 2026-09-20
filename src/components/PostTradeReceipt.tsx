@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { OrderStateRecord, UserAccountBalance, PostTradeSurvey } from '../types/trading';
-import { CheckCircle2, Download, MessageSquare, X } from 'lucide-react';
+import { CheckCircle2, Download, MessageSquare, X, ShieldCheck, ArrowRight } from 'lucide-react';
 
 interface PostTradeReceiptProps {
   order: OrderStateRecord;
@@ -16,11 +16,11 @@ const SURVEY_CATEGORIES: PostTradeSurvey['category'][] = [
 ];
 
 const CATEGORY_LABELS: Record<PostTradeSurvey['category'], string> = {
-  MARGIN_BUFFER: 'Margin & Buffer',
-  EXECUTION_LATENCY: 'Execution Speed',
-  FEES: 'Fees & Costs',
-  RECONCILIATION: 'Order Recovery',
-  OTHER: 'Other',
+  MARGIN_BUFFER: 'Margin & Health Buffer',
+  EXECUTION_LATENCY: 'Execution Latency',
+  FEES: 'Fees & Funding Costs',
+  RECONCILIATION: 'Recovery & Partial Fills',
+  OTHER: 'General Feedback',
 };
 
 function fmt(ts?: number) {
@@ -33,9 +33,6 @@ export default function PostTradeReceipt({ order, balance, onSurveySubmit, onDis
   const [rating, setRating] = useState<PostTradeSurvey['rating']>('CLEAR');
   const [category, setCategory] = useState<PostTradeSurvey['category']>('MARGIN_BUFFER');
   const [notes, setNotes] = useState('');
-
-  const pnlUsd = order.avgFillPrice > 0 ? order.filledQty * order.avgFillPrice : 0;
-  const withdrawalSimInr = balance.availableUsd * balance.inrExchangeRate;
 
   function handleSubmit() {
     const survey: PostTradeSurvey = {
@@ -50,122 +47,139 @@ export default function PostTradeReceipt({ order, balance, onSurveySubmit, onDis
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-lg bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-800">
-          <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+      <div className="relative w-full max-w-lg card-elevated shadow-2xl border-[var(--border)] bg-[var(--bg-surface)] overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-md bg-[var(--green-dim)] flex items-center justify-center text-[var(--green)]">
+              <CheckCircle2 className="w-4 h-4" />
+            </div>
             <div>
-              <h2 className="text-white font-bold text-base">Transaction Receipt</h2>
-              <p className="text-zinc-500 text-xs">Verified execution summary</p>
+              <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Execution Receipt</h2>
+              <p className="text-[11px] text-[var(--text-secondary)]">Settled Trade Record & Verified Outcome</p>
             </div>
           </div>
-          <button onClick={onDismiss} className="text-zinc-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onDismiss}
+            className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-4">
-          {/* Execution details */}
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 space-y-2 text-sm">
+        <div className="p-5 space-y-4">
+          {/* Order execution summary table */}
+          <div className="card p-3.5 bg-[var(--bg-elevated)] border-[var(--border)] space-y-1.5 text-[12px]">
             {[
               ['Contract', order.symbol],
               ['Side', order.side],
-              ['Requested Qty', `${order.requestedQty} contracts`],
-              ['Filled Qty', `${order.filledQty} contracts`],
+              ['Filled Volume', `${order.filledQty} of ${order.requestedQty} contracts`],
               ['Avg Fill Price', order.avgFillPrice > 0 ? `$${order.avgFillPrice.toFixed(2)}` : '—'],
-              ['Remaining Exposure', `${order.remainingQty} contracts`],
-              ['Order Submitted', fmt(order.timestampSent)],
-              ['Venue Confirmed', fmt(order.timestampAcked)],
-              ['Request ID', order.requestId],
-              ['Idempotency Key', order.idempotencyKey],
+              ['Remaining Live', `${order.remainingQty} contracts`],
+              ['Venue Time', fmt(order.timestampAcked)],
+              ['Deduplication Key', order.idempotencyKey],
             ].map(([label, value]) => (
-              <div key={label} className="flex items-center justify-between">
-                <span className="text-zinc-400">{label}</span>
-                <span className={`text-white font-medium font-mono text-xs truncate ml-2 max-w-[55%] text-right ${
-                  label === 'Remaining Exposure' && order.remainingQty > 0 ? 'text-amber-400' : ''
-                }`}>{value}</span>
+              <div key={label} className="flex items-center justify-between py-0.5">
+                <span className="text-[var(--text-secondary)]">{label}</span>
+                <span className="font-mono font-semibold text-[var(--text-primary)] truncate max-w-[60%] text-right">{value}</span>
               </div>
             ))}
           </div>
 
-          {/* Balance snapshot */}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-3">
-              <p className="text-zinc-500 text-xs mb-1">Available Funds</p>
-              <p className="text-emerald-400 font-bold text-lg">${balance.availableUsd.toFixed(2)}</p>
-              <p className="text-zinc-600 text-xs">₹{(balance.availableUsd * balance.inrExchangeRate).toFixed(0)} est.</p>
+          {/* Account snapshot */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="card p-3 bg-[var(--bg-elevated)] border-[var(--border)]">
+              <span className="stat-label">Available Balance</span>
+              <p className="text-[16px] font-mono font-bold text-[var(--green)] mt-0.5">
+                ${balance.availableUsd.toFixed(2)}
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)] font-mono">
+                ≈ ₹{(balance.availableUsd * balance.inrExchangeRate).toFixed(0)}
+              </p>
             </div>
-            <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-3">
-              <p className="text-zinc-500 text-xs mb-1">Committed Margin</p>
-              <p className="text-amber-400 font-bold text-lg">${balance.committedMarginUsd.toFixed(2)}</p>
-              <p className="text-zinc-600 text-xs">₹{(balance.committedMarginUsd * balance.inrExchangeRate).toFixed(0)} est.</p>
+            <div className="card p-3 bg-[var(--bg-elevated)] border-[var(--border)]">
+              <span className="stat-label">Committed Margin</span>
+              <p className="text-[16px] font-mono font-bold text-[var(--brand)] mt-0.5">
+                ${balance.committedMarginUsd.toFixed(2)}
+              </p>
+              <p className="text-[10px] text-[var(--text-muted)]">
+                {order.remainingQty > 0 ? 'Residual position active' : 'Zero margin locked'}
+              </p>
             </div>
           </div>
 
-          {/* Simulated withdrawal tracker */}
-          <div className="bg-zinc-800/40 border border-zinc-700 rounded-xl p-3 text-xs text-zinc-400">
-            <div className="flex items-center gap-2 mb-1.5">
-              <Download className="w-3.5 h-3.5 text-zinc-500" />
-              <span className="font-medium text-zinc-300">Simulated INR Withdrawal Track</span>
-            </div>
-            <div className="space-y-1">
-              <div className="flex justify-between"><span>Available for withdrawal</span><span className="text-emerald-400">₹{withdrawalSimInr.toFixed(0)}</span></div>
-              <div className="flex justify-between"><span>Est. settlement time</span><span className="text-zinc-300">T+1 (next business day)</span></div>
-              <div className="flex justify-between"><span>Exchange rate used</span><span className="text-zinc-300">₹{balance.inrExchangeRate.toFixed(2)}/USD</span></div>
-            </div>
-            <p className="text-zinc-600 mt-1.5 italic">Simulated only — not a real banking operation.</p>
-          </div>
-
-          {/* Feedback */}
+          {/* Feedback survey trigger */}
           {!showSurvey ? (
             <button
               onClick={() => setShowSurvey(true)}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-zinc-700 text-zinc-400 text-sm hover:bg-zinc-800 transition-colors"
+              className="btn btn-ghost btn-sm btn-full"
             >
-              <MessageSquare className="w-4 h-4" />
-              What surprised you? (Optional feedback)
+              <MessageSquare className="w-3.5 h-3.5 text-[var(--brand)]" />
+              <span>Did this trade execute as you expected? (Survey)</span>
             </button>
           ) : (
-            <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 space-y-3">
-              <p className="text-white font-semibold text-sm">What was your experience?</p>
-              <div className="grid grid-cols-4 gap-2">
-                {(['CONFIDENT', 'CLEAR', 'SURPRISED', 'CONFUSED'] as PostTradeSurvey['rating'][]).map((r) => (
-                  <button
-                    key={r}
-                    onClick={() => setRating(r)}
-                    className={`py-1.5 text-xs rounded-lg border transition-colors ${
-                      rating === r
-                        ? 'bg-amber-500/20 border-amber-500/40 text-amber-400'
-                        : 'border-zinc-700 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'
-                    }`}
-                  >{r}</button>
-                ))}
+            <div className="card p-3.5 bg-[var(--bg-interactive)] border-[var(--border)] space-y-3 fade-in">
+              <p className="font-semibold text-[12px] text-[var(--text-primary)]">Post-Execution Clarity Check</p>
+
+              <div>
+                <span className="stat-label block mb-1">Clarity Rating</span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['CLEAR', 'SURPRISED', 'CONFUSED'] as const).map((r) => (
+                    <button
+                      key={r}
+                      onClick={() => setRating(r)}
+                      className={`py-1.5 rounded text-[11px] font-bold border transition-all ${
+                        rating === r
+                          ? 'bg-[var(--brand-dim)] border-[var(--brand)] text-[var(--brand)]'
+                          : 'bg-[var(--bg-elevated)] border-[var(--border)] text-[var(--text-secondary)]'
+                      }`}
+                    >
+                      {r === 'CLEAR' ? 'Clear' : r === 'SURPRISED' ? 'Surprised' : 'Confused'}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value as PostTradeSurvey['category'])}
-                className="w-full bg-zinc-900 border border-zinc-700 text-sm text-zinc-300 rounded-lg px-3 py-2"
-              >
-                {SURVEY_CATEGORIES.map((c) => <option key={c} value={c}>{CATEGORY_LABELS[c]}</option>)}
-              </select>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Describe what surprised you or confused you..."
-                className="w-full bg-zinc-900 border border-zinc-700 text-sm text-zinc-300 rounded-lg px-3 py-2 h-16 resize-none focus:outline-none focus:ring-1 focus:ring-amber-500"
-              />
-              <button
-                onClick={handleSubmit}
-                className="w-full py-2 rounded-lg bg-amber-500/15 border border-amber-500/30 text-amber-400 text-sm font-semibold hover:bg-amber-500/25 transition-colors"
-              >
-                Submit Feedback
-              </button>
-              {(rating === 'CONFUSED' || rating === 'SURPRISED') && (
-                <p className="text-xs text-zinc-500">A support ticket will be auto-created for your response.</p>
-              )}
+
+              <div>
+                <span className="stat-label block mb-1">Topic</span>
+                <select
+                  value={category}
+                  onChange={(e) => setCategory(e.target.value as PostTradeSurvey['category'])}
+                  className="input-field text-[12px]"
+                >
+                  {SURVEY_CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>{CATEGORY_LABELS[cat]}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <span className="stat-label block mb-1">Feedback / Unexpected outcomes</span>
+                <textarea
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  placeholder="Tell us if fees, margin requirements or latency differed from expectations..."
+                  rows={2}
+                  className="input-field text-[12px] resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2">
+                <button onClick={handleSubmit} className="btn btn-brand btn-sm flex-1">
+                  Submit Feedback
+                </button>
+                <button onClick={() => setShowSurvey(false)} className="btn btn-ghost btn-sm">
+                  Cancel
+                </button>
+              </div>
             </div>
           )}
+
+          {/* Dismiss CTA */}
+          <button onClick={onDismiss} className="btn btn-brand btn-full py-2.5 text-[13px]">
+            Return to Trading Terminal
+          </button>
         </div>
       </div>
     </div>

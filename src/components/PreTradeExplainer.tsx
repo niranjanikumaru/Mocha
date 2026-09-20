@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { ContractSymbol, ContractDefinition } from '../types/trading';
 import { CONTRACT_CATALOG, INITIAL_MARK_PRICES } from '../lib/contracts';
 import { calcPreTradeSummary } from '../lib/marginCalculator';
-import { AlertTriangle, Info, ChevronDown, ChevronUp, PlayCircle, X } from 'lucide-react';
+import { AlertTriangle, Info, ChevronDown, ChevronUp, PlayCircle, X, ShieldCheck, Check } from 'lucide-react';
 
 interface PreTradeExplainerProps {
   selectedSymbol: ContractSymbol;
@@ -39,160 +39,185 @@ export default function PreTradeExplainer({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto bg-zinc-900 border border-zinc-700 rounded-2xl shadow-2xl">
-        {/* Header */}
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 bg-zinc-900 border-b border-zinc-800 rounded-t-2xl">
-          <div>
-            <h2 className="text-white font-bold text-lg">Understand Before You Trade</h2>
-            <p className="text-zinc-400 text-xs mt-0.5">MochaTrade Perpetual Futures · Fictional sample data</p>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
+      <div className="relative w-full max-w-2xl max-h-[92vh] overflow-y-auto card-elevated shadow-2xl border-[var(--border)] bg-[var(--bg-surface)]">
+        {/* Modal Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-[var(--bg-surface)] border-b border-[var(--border)]">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 rounded-md bg-[var(--brand-dim)] flex items-center justify-center text-[var(--brand)]">
+              <Info className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-[15px] font-bold text-[var(--text-primary)]">Contract Rules & Visible Risk</h2>
+              <p className="text-[11px] text-[var(--text-secondary)]">{contract.underlyingName} Perpetual ({selectedSymbol})</p>
+            </div>
           </div>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
-            <X className="w-5 h-5" />
+          <button
+            onClick={onClose}
+            className="w-8 h-8 rounded-md flex items-center justify-center text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-hover)] transition-colors"
+          >
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
+        <div className="p-5 space-y-4">
           {/* Symbol + leverage selector */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-1">
-              <label className="text-xs text-zinc-500 mb-1 block">Contract</label>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="stat-label block mb-1">Contract Market</label>
               <select
                 value={selectedSymbol}
                 onChange={(e) => onSymbolChange(e.target.value as ContractSymbol)}
-                className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="input-field"
               >
                 {SYMBOLS.map((s) => (
                   <option key={s} value={s}>{CONTRACT_CATALOG[s].underlyingTicker} Perp</option>
                 ))}
               </select>
             </div>
-            <div className="col-span-1">
-              <label className="text-xs text-zinc-500 mb-1 block">Quantity (contracts)</label>
+            <div>
+              <label className="stat-label block mb-1">Quantity (Contracts)</label>
               <input
                 type="number" min={1} max={500} value={quantity}
                 onChange={(e) => onQuantityChange(Number(e.target.value))}
-                className="w-full bg-zinc-800 border border-zinc-700 text-white text-sm rounded-lg px-3 py-2 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                className="input-field font-mono"
               />
             </div>
-            <div className="col-span-1">
-              <label className="text-xs text-zinc-500 mb-1 block">Leverage ({leverage}x)</label>
+            <div>
+              <div className="flex justify-between items-center mb-1">
+                <label className="stat-label">Leverage</label>
+                <span className="text-[12px] font-mono font-bold text-[var(--brand)]">{leverage}×</span>
+              </div>
               <input
                 type="range" min={1} max={contract.maxLeverage} value={leverage}
                 onChange={(e) => onLeverageChange(Number(e.target.value))}
-                className="w-full mt-2 accent-amber-500"
+                className="mt-2"
               />
             </div>
           </div>
 
-          {/* Perpetual vs Ownership explainer */}
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4 space-y-3">
-            <div className="flex items-center gap-2 text-amber-400 font-semibold text-sm">
+          {/* Perpetual vs Ownership explainer — Kalshi style comparison */}
+          <div className="card p-4 bg-[var(--bg-elevated)] border-[var(--border)] space-y-3">
+            <div className="flex items-center gap-2 text-[var(--brand)] font-semibold text-[13px]">
               <Info className="w-4 h-4" />
-              Perpetual Futures ≠ Share Ownership
+              <span>Perpetual Futures Contract ≠ Share Ownership</span>
             </div>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              {[
-                ['Perpetual Contract (This)', 'Synthetic price exposure only', 'Funding fees paid every 8 hours', 'No voting rights or dividends', 'Leveraged · liquidation possible', 'Close any time · no expiry'],
-                ['Owning Shares', 'Own a piece of the company', 'No funding fees', 'Voting rights & dividends', 'No liquidation risk', 'Must sell on exchange to exit'],
-              ].map(([title, ...items], i) => (
-                <div key={i} className={`rounded-lg p-3 space-y-1.5 ${i === 0 ? 'bg-amber-500/10 border border-amber-500/20' : 'bg-zinc-700/40 border border-zinc-700'}`}>
-                  <p className={`font-semibold mb-2 ${i === 0 ? 'text-amber-400' : 'text-zinc-300'}`}>{title}</p>
-                  {items.map((item, j) => (
-                    <p key={j} className="text-zinc-400 flex items-start gap-1.5">
-                      <span className={i === 0 ? 'text-amber-500' : 'text-zinc-600'}>•</span> {item}
-                    </p>
-                  ))}
-                </div>
-              ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[12px]">
+              <div className="p-3 rounded-lg bg-[var(--brand-dim)] border border-[var(--brand-border)] space-y-1.5">
+                <p className="font-bold text-[var(--brand)] mb-1">Perpetual Contract (MochaTrade)</p>
+                <p className="text-[var(--text-secondary)]">• Cash-settled synthetic exposure</p>
+                <p className="text-[var(--text-secondary)]">• 8-hour funding rate mechanism</p>
+                <p className="text-[var(--text-secondary)]">• Leveraged margin with liquidation threshold</p>
+                <p className="text-[var(--text-secondary)]">• No share voting rights or dividends</p>
+              </div>
+              <div className="p-3 rounded-lg bg-[var(--bg-interactive)] border border-[var(--border)] space-y-1.5">
+                <p className="font-bold text-[var(--text-primary)] mb-1">Cash Equity Shares</p>
+                <p className="text-[var(--text-secondary)]">• Direct fractional ownership</p>
+                <p className="text-[var(--text-secondary)]">• No ongoing funding fees</p>
+                <p className="text-[var(--text-secondary)]">• Zero liquidation risk from price swings</p>
+                <p className="text-[var(--text-secondary)]">• Eligible for corporate dividend actions</p>
+              </div>
             </div>
           </div>
 
           {/* Ownership-goal mismatch warning */}
           {showOwnershipWarning && (
-            <div className="flex items-start gap-3 bg-rose-500/10 border border-rose-500/20 rounded-xl p-4">
-              <AlertTriangle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
-              <div className="flex-1 text-xs text-rose-300">
-                <strong className="text-rose-400">Goal mismatch check:</strong> If your goal is long-term investment in {contract.underlyingName}, a perpetual contract may not be suitable — you will pay funding fees over time and face liquidation risk. This instrument is designed for short-to-medium term directional exposure.
+            <div className="p-3 bg-[rgba(239,68,68,0.1)] border border-[rgba(239,68,68,0.25)] rounded-lg flex items-start gap-2.5">
+              <AlertTriangle className="w-4 h-4 text-[var(--red)] shrink-0 mt-0.5" />
+              <div className="flex-1 text-[11px] text-[var(--red)] leading-snug">
+                <strong className="font-bold">Suitability Notice:</strong> If your intention is multi-year passive buy-and-hold investing, perpetual contracts may erode your capital via cumulative funding fees. Perpetual instruments are designed for directional traders and short-term tactical hedging.
               </div>
-              <button onClick={() => setShowOwnershipWarning(false)} className="text-rose-500 hover:text-rose-300">
-                <X className="w-4 h-4" />
+              <button onClick={() => setShowOwnershipWarning(false)} className="text-[var(--red)] opacity-60 hover:opacity-100">
+                <X className="w-3.5 h-3.5" />
               </button>
             </div>
           )}
 
-          {/* Cost summary */}
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-white font-semibold text-sm">Position Cost Summary</p>
-              <p className="text-zinc-500 text-xs">Mark price: ${markPrice.toFixed(2)} (fictional sample)</p>
+          {/* Cost breakdown */}
+          <div className="card p-4 bg-[var(--bg-elevated)] border-[var(--border)]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="font-semibold text-[13px] text-[var(--text-primary)]">Cost & Margin Requirements</span>
+              <span className="text-[11px] font-mono text-[var(--text-secondary)]">Mark: ${markPrice.toFixed(2)}</span>
             </div>
-            <div className="space-y-2 text-sm">
-              {[
-                ['Total Notional Exposure', `$${summary.notionalUsd.toFixed(2)}`, `₹${summary.notionalInr.toFixed(0)}`],
-                ['Required Initial Margin', `$${summary.initialMarginUsd.toFixed(2)}`, `₹${summary.initialMarginInr.toFixed(0)}`],
-              ].map(([label, usd, inr]) => (
-                <div key={label} className="flex items-center justify-between">
-                  <span className="text-zinc-400">{label}</span>
-                  <div className="text-right">
-                    <span className="text-white font-medium">{usd}</span>
-                    <span className="text-zinc-500 text-xs ml-2">{inr}</span>
-                  </div>
-                </div>
-              ))}
+
+            <div className="space-y-1.5 text-[12px]">
+              <div className="data-row">
+                <span className="text-[var(--text-secondary)]">Total Notional Position Value</span>
+                <span className="font-mono font-bold text-[var(--text-primary)]">${summary.notionalUsd.toFixed(2)} (₹{summary.notionalInr.toFixed(0)})</span>
+              </div>
+              <div className="data-row">
+                <span className="text-[var(--text-secondary)]">Committed Initial Margin</span>
+                <span className="font-mono font-bold text-[var(--brand)]">${summary.initialMarginUsd.toFixed(2)} (₹{summary.initialMarginInr.toFixed(0)})</span>
+              </div>
+
+              {/* Collapsible fee details */}
               <button
                 onClick={() => setShowFeeBreakdown(!showFeeBreakdown)}
-                className="flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300 mt-1"
+                className="flex items-center gap-1 text-[11px] text-[var(--brand)] hover:underline mt-1 pt-1"
               >
                 {showFeeBreakdown ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                {showFeeBreakdown ? 'Hide' : 'Show'} fee breakdown
+                {showFeeBreakdown ? 'Hide Itemised Fees' : 'View Itemised Fees & Conversion'}
               </button>
+
               {showFeeBreakdown && (
-                <div className="mt-2 pl-3 border-l border-zinc-700 space-y-1.5 text-xs text-zinc-400">
-                  <div className="flex justify-between"><span>Taker fee ({(contract.takerFeeRate * 100).toFixed(3)}%)</span><span className="text-white">${summary.takerFeeUsd.toFixed(4)}</span></div>
-                  <div className="flex justify-between"><span>INR→USD conversion spread ({(contract.inrUsdConversionSpread * 100).toFixed(2)}%)</span><span className="text-white">${summary.conversionFeeUsd.toFixed(4)}</span></div>
-                  <div className="flex justify-between"><span>Funding per 8h (est.)</span><span className="text-white">${summary.fundingPer8hUsd.toFixed(4)}</span></div>
+                <div className="mt-1.5 pl-3 border-l-2 border-[var(--border)] space-y-1 text-[11px] text-[var(--text-secondary)] fade-in">
+                  <div className="flex justify-between">
+                    <span>Venue Taker Fee ({(contract.takerFeeRate * 100).toFixed(3)}%)</span>
+                    <span className="font-mono text-[var(--text-primary)]">${summary.takerFeeUsd.toFixed(4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>INR↔USD Conversion Spread ({(contract.inrUsdConversionSpread * 100).toFixed(2)}%)</span>
+                    <span className="font-mono text-[var(--text-primary)]">${summary.conversionFeeUsd.toFixed(4)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Estimated 8-Hour Funding Rate</span>
+                    <span className="font-mono text-[var(--text-primary)]">${summary.fundingPer8hUsd.toFixed(4)}</span>
+                  </div>
                 </div>
               )}
-              <div className="pt-2 mt-1 border-t border-zinc-700 flex items-center justify-between font-semibold">
-                <span className="text-white">Total upfront cost</span>
-                <span className="text-amber-400">${summary.totalCostUsd.toFixed(2)}</span>
+
+              <div className="data-row pt-2 border-t border-[var(--border)] font-semibold text-[13px]">
+                <span className="text-[var(--text-primary)]">Total Upfront Capital Required</span>
+                <span className="font-mono text-[var(--brand)]">${summary.totalCostUsd.toFixed(2)}</span>
               </div>
-              <div className="text-xs text-zinc-500 mt-1">
-                Est. liquidation at: <span className="text-rose-400 font-medium">${summary.estimatedLiquidationPrice.toFixed(2)}</span> · Maintenance margin: {(contract.maintenanceMarginRate * 100).toFixed(0)}%
+              <div className="text-[11px] text-[var(--text-muted)] flex justify-between pt-0.5">
+                <span>Est. Liquidation Price: <strong className="text-[var(--red)] font-mono">${summary.estimatedLiquidationPrice.toFixed(2)}</strong></span>
+                <span>Maintenance Margin: {(contract.maintenanceMarginRate * 100).toFixed(0)}%</span>
               </div>
             </div>
           </div>
 
-          {/* Adverse scenarios */}
-          <div className="bg-zinc-800/60 border border-zinc-700 rounded-xl p-4">
-            <p className="text-white font-semibold text-sm mb-3">If the price moves against you (fictional sample)</p>
+          {/* Adverse price drop simulation */}
+          <div className="card p-4 bg-[var(--bg-elevated)] border-[var(--border)]">
+            <p className="font-semibold text-[13px] text-[var(--text-primary)] mb-2.5">Adverse Scenario Simulator</p>
             <div className="grid grid-cols-3 gap-2">
               {adverseScenarios.map(({ drop, loss }) => (
-                <div key={drop} className={`rounded-lg p-3 text-center border ${drop === 5 ? 'border-amber-500/30 bg-amber-500/5' : drop === 10 ? 'border-orange-500/30 bg-orange-500/5' : 'border-rose-500/30 bg-rose-500/5'}`}>
-                  <p className={`text-lg font-bold ${drop === 5 ? 'text-amber-400' : drop === 10 ? 'text-orange-400' : 'text-rose-400'}`}>−{drop}%</p>
-                  <p className="text-white text-sm font-semibold mt-1">${loss.toFixed(0)}</p>
-                  <p className="text-zinc-500 text-xs">₹{(loss * 86.85).toFixed(0)} loss</p>
+                <div key={drop} className="p-2.5 rounded-lg text-center bg-[var(--bg-interactive)] border border-[var(--border)]">
+                  <p className="font-mono text-[14px] font-bold text-[var(--red)]">−{drop}% Drop</p>
+                  <p className="font-mono text-[13px] font-semibold text-[var(--text-primary)] mt-1">−${loss.toFixed(0)}</p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono">≈ ₹{(loss * 86.85).toFixed(0)}</p>
                 </div>
               ))}
             </div>
-            <p className="text-zinc-600 text-xs mt-2">⚠ Sample calculation only. Stop orders do not guarantee an execution price.</p>
+            <p className="text-[10px] text-[var(--text-muted)] mt-2">
+              * Calculations based on selected {leverage}× leverage. Stop losses do not guarantee slippage-free execution in high volatility.
+            </p>
           </div>
 
-          {/* CTA */}
-          <div className="flex gap-3 pt-1">
+          {/* Actions */}
+          <div className="flex gap-3 pt-2">
             <button
               onClick={onOpenSimulation}
-              className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 font-semibold hover:bg-amber-500/20 transition-colors"
+              className="btn btn-brand flex-1 py-2.5 text-[13px]"
             >
               <PlayCircle className="w-4 h-4" />
-              Try Simulation First (Recommended)
+              Open Simulation Position First
             </button>
             <button
               onClick={onClose}
-              className="flex-1 py-3 rounded-xl bg-zinc-700 hover:bg-zinc-600 text-white font-semibold transition-colors"
+              className="btn btn-ghost flex-1 py-2.5 text-[13px]"
             >
-              I Understand — Continue
+              I Understand — Proceed
             </button>
           </div>
         </div>

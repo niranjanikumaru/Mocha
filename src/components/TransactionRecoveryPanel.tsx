@@ -1,7 +1,7 @@
 'use client';
 
 import { OrderStateRecord, OrderExecutionStatus } from '../types/trading';
-import { CheckCircle2, Clock, AlertCircle, RefreshCw, XCircle, Loader2, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Clock, AlertCircle, RefreshCw, XCircle, Loader2, ShieldCheck, ArrowRight } from 'lucide-react';
 
 interface TransactionRecoveryPanelProps {
   order: OrderStateRecord | null;
@@ -11,14 +11,14 @@ interface TransactionRecoveryPanelProps {
   duplicateAttempts: number;
 }
 
-const STATUS_META: Record<OrderExecutionStatus, { label: string; color: string; icon: React.ReactNode }> = {
-  IDLE: { label: 'No Active Order', color: 'text-zinc-400', icon: <Clock className="w-4 h-4 text-zinc-500" /> },
-  SUBMITTING: { label: 'Submitting to Venue…', color: 'text-amber-400', icon: <Loader2 className="w-4 h-4 text-amber-400 animate-spin" /> },
-  ACK_LOST_PENDING_RECON: { label: 'Unresolved — Awaiting Reconciliation', color: 'text-rose-400', icon: <AlertCircle className="w-4 h-4 text-rose-400 animate-pulse" /> },
-  PARTIALLY_FILLED: { label: 'Partially Filled', color: 'text-amber-400', icon: <ShieldCheck className="w-4 h-4 text-amber-400" /> },
-  FILLED: { label: 'Fully Filled', color: 'text-emerald-400', icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" /> },
-  CANCELLED: { label: 'Cancelled', color: 'text-zinc-400', icon: <XCircle className="w-4 h-4 text-zinc-500" /> },
-  REJECTED: { label: 'Rejected by Venue', color: 'text-rose-400', icon: <XCircle className="w-4 h-4 text-rose-400" /> },
+const STATUS_META: Record<OrderExecutionStatus, { label: string; badgeClass: string; icon: React.ReactNode }> = {
+  IDLE: { label: 'Idle', badgeClass: 'badge-muted', icon: <Clock className="w-3.5 h-3.5 text-[var(--text-muted)]" /> },
+  SUBMITTING: { label: 'Submitting…', badgeClass: 'badge-yellow', icon: <Loader2 className="w-3.5 h-3.5 text-[var(--yellow)] animate-spin" /> },
+  ACK_LOST_PENDING_RECON: { label: 'Unresolved — Reconciling', badgeClass: 'badge-red', icon: <AlertCircle className="w-3.5 h-3.5 text-[var(--red)] animate-pulse" /> },
+  PARTIALLY_FILLED: { label: 'Partially Filled', badgeClass: 'badge-yellow', icon: <ShieldCheck className="w-3.5 h-3.5 text-[var(--yellow)]" /> },
+  FILLED: { label: 'Fully Settled', badgeClass: 'badge-green', icon: <CheckCircle2 className="w-3.5 h-3.5 text-[var(--green)]" /> },
+  CANCELLED: { label: 'Cancelled', badgeClass: 'badge-muted', icon: <XCircle className="w-3.5 h-3.5 text-[var(--text-muted)]" /> },
+  REJECTED: { label: 'Rejected', badgeClass: 'badge-red', icon: <XCircle className="w-3.5 h-3.5 text-[var(--red)]" /> },
 };
 
 function fmt(ts?: number) {
@@ -31,8 +31,8 @@ export default function TransactionRecoveryPanel({
 }: TransactionRecoveryPanelProps) {
   if (!order) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-5 text-center text-zinc-600 text-sm">
-        No active order. Submit a close to begin tracking.
+      <div className="card p-4 text-center text-[12px] text-[var(--text-muted)] bg-[var(--bg-surface)]">
+        No active orders. Executed transaction state & audit trail will appear here.
       </div>
     );
   }
@@ -44,128 +44,135 @@ export default function TransactionRecoveryPanel({
   const canClose = !isUnresolved && !isReconciling && !isFilled;
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 overflow-hidden">
+    <div className="card-elevated overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800">
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-surface)]">
+        <div className="flex items-center gap-2.5">
           {meta.icon}
           <div>
-            <p className="text-xs text-zinc-500 uppercase tracking-wider font-medium">Order Status</p>
-            <p className={`font-bold text-sm mt-0.5 ${meta.color}`}>{meta.label}</p>
-          </div>
-        </div>
-        <div className="text-right text-xs text-zinc-600">
-          <p>Request ID</p>
-          <p className="text-zinc-400 font-mono">{order.requestId.slice(0, 16)}…</p>
-        </div>
-      </div>
-
-      {/* Unresolved warning banner */}
-      {isUnresolved && (
-        <div className="mx-4 mt-4 p-4 bg-rose-500/10 border border-rose-500/30 rounded-xl">
-          <div className="flex items-start gap-3">
-            <AlertCircle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
-            <div className="text-xs text-rose-300 space-y-1">
-              <p className="font-semibold text-rose-400">Order outcome is unconfirmed</p>
-              <p>The venue may have filled this order, but the acknowledgement was not received. Do not submit another close order — it may result in an opposite position.</p>
-              <p className="text-rose-500">Reconcile with the venue first to retrieve the verified fill state.</p>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold tracking-wider text-[var(--text-secondary)] uppercase">Execution Ledger</span>
+              <span className={`badge ${meta.badgeClass}`}>{meta.label}</span>
             </div>
           </div>
         </div>
-      )}
-
-      {/* Fill summary */}
-      <div className="grid grid-cols-3 gap-3 px-5 py-4">
-        <div className="bg-zinc-800/60 rounded-xl p-3 border border-zinc-700">
-          <p className="text-zinc-500 text-xs mb-1">Requested Qty</p>
-          <p className="text-white font-bold text-xl">{order.requestedQty}</p>
-          <p className="text-zinc-500 text-xs">contracts</p>
-        </div>
-        <div className="bg-zinc-800/60 rounded-xl p-3 border border-zinc-700">
-          <p className="text-zinc-500 text-xs mb-1">Filled Qty</p>
-          <p className={`font-bold text-xl ${isUnresolved ? 'text-zinc-600' : 'text-emerald-400'}`}>
-            {isUnresolved ? '?' : order.filledQty}
-          </p>
-          {!isUnresolved && order.avgFillPrice > 0 && (
-            <p className="text-zinc-500 text-xs">@ ${order.avgFillPrice.toFixed(2)}</p>
-          )}
-        </div>
-        <div className="bg-zinc-800/60 rounded-xl p-3 border border-zinc-700">
-          <p className="text-zinc-500 text-xs mb-1">Remaining Exposure</p>
-          <p className={`font-bold text-xl ${order.remainingQty > 0 ? 'text-amber-400' : 'text-emerald-400'}`}>
-            {isUnresolved ? '?' : order.remainingQty}
-          </p>
-          <p className="text-zinc-500 text-xs">{isUnresolved ? 'pending recon' : 'contracts live'}</p>
+        <div className="text-right">
+          <span className="text-[10px] text-[var(--text-muted)] font-mono">REQ #{order.requestId.slice(0, 10)}</span>
         </div>
       </div>
 
-      {/* Partial fill note */}
+      {/* Unresolved Alert */}
+      {isUnresolved && (
+        <div className="p-3 bg-[rgba(239,68,68,0.12)] border-b border-[rgba(239,68,68,0.25)] flex items-start gap-2.5">
+          <AlertCircle className="w-4 h-4 text-[var(--red)] shrink-0 mt-0.5" />
+          <div className="text-[11px] text-[var(--red)] leading-snug space-y-1">
+            <p className="font-bold">ACK packet dropped in transit. Outcome unconfirmed.</p>
+            <p className="text-[rgba(239,68,68,0.85)]">
+              Venue received the order, but your terminal lost connection before the fill acknowledgement. Duplicate orders are locked to avoid inverse exposure.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Partial fill banner */}
       {isPartial && (
-        <div className="mx-4 mb-3 p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl text-xs text-amber-300">
-          <strong className="text-amber-400">Partial fill:</strong> {order.filledQty} of {order.requestedQty} contracts were closed at ${order.avgFillPrice.toFixed(2)}. You still have {order.remainingQty} contracts open. Review before submitting another order.
+        <div className="p-3 bg-[rgba(234,179,8,0.10)] border-b border-[rgba(234,179,8,0.25)] flex items-start gap-2.5">
+          <ShieldCheck className="w-4 h-4 text-[var(--yellow)] shrink-0 mt-0.5" />
+          <div className="text-[11px] text-[var(--yellow)] leading-snug">
+            <strong className="font-semibold">Partial fill confirmed:</strong> {order.filledQty} of {order.requestedQty} closed at ${order.avgFillPrice.toFixed(2)}. Remaining {order.remainingQty} contracts remain live in your position.
+          </div>
         </div>
       )}
 
-      {/* Duplicate protection */}
+      {/* Duplicate attempts blocked badge */}
       {duplicateAttempts > 0 && (
-        <div className="mx-4 mb-3 p-3 bg-zinc-800 border border-zinc-700 rounded-xl text-xs text-zinc-400 flex items-center gap-2">
-          <ShieldCheck className="w-4 h-4 text-emerald-500 shrink-0" />
-          <span><strong className="text-emerald-400">{duplicateAttempts}</strong> duplicate submission{duplicateAttempts > 1 ? 's' : ''} blocked. The same idempotency key prevents double-execution.</span>
+        <div className="px-4 py-2 bg-[var(--bg-interactive)] border-b border-[var(--border)] flex items-center justify-between text-[11px]">
+          <span className="flex items-center gap-1.5 text-[var(--green)]">
+            <ShieldCheck className="w-3.5 h-3.5" />
+            <span>Idempotency Deduplication Engine</span>
+          </span>
+          <span className="badge badge-green font-mono">{duplicateAttempts} double-clicks blocked</span>
         </div>
       )}
 
-      {/* Audit trail */}
-      <div className="px-5 pb-3">
-        <p className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Verified Audit Trail</p>
-        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+      {/* Quantity & Fill Breakdown */}
+      <div className="grid grid-cols-3 gap-2 p-3 bg-[var(--bg-surface)]">
+        <div className="card p-2.5 bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-center">
+          <p className="stat-label">Requested</p>
+          <p className="text-[16px] font-mono font-bold text-[var(--text-primary)] mt-0.5">{order.requestedQty}</p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">contracts</p>
+        </div>
+
+        <div className="card p-2.5 bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-center">
+          <p className="stat-label">Filled</p>
+          <p className={`text-[16px] font-mono font-bold mt-0.5 ${isUnresolved ? 'text-[var(--text-muted)]' : 'text-[var(--green)]'}`}>
+            {isUnresolved ? '?' : order.filledQty}
+          </p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+            {order.avgFillPrice > 0 ? `@ $${order.avgFillPrice.toFixed(2)}` : 'unconfirmed'}
+          </p>
+        </div>
+
+        <div className="card p-2.5 bg-[var(--bg-elevated)] border-[var(--border-subtle)] text-center">
+          <p className="stat-label">Remaining</p>
+          <p className={`text-[16px] font-mono font-bold mt-0.5 ${order.remainingQty > 0 ? 'text-[var(--brand)]' : 'text-[var(--green)]'}`}>
+            {isUnresolved ? '?' : order.remainingQty}
+          </p>
+          <p className="text-[10px] text-[var(--text-muted)] mt-0.5">
+            {isUnresolved ? 'awaiting recon' : order.remainingQty > 0 ? 'open exposure' : 'zero'}
+          </p>
+        </div>
+      </div>
+
+      {/* Audit Log Timeline */}
+      <div className="px-4 py-3 bg-[var(--bg-surface)] border-t border-[var(--border)]">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-muted)]">Verified Audit Trail</span>
+          <span className="text-[10px] text-[var(--text-muted)] font-mono">{order.auditTrail.length} events logged</span>
+        </div>
+
+        <div className="space-y-2 max-h-36 overflow-y-auto pr-1">
           {order.auditTrail.map((entry) => (
-            <div key={entry.id} className="flex items-start gap-3 text-xs">
-              <div className="shrink-0 mt-0.5">
-                <div className="w-2 h-2 rounded-full bg-zinc-600 mt-0.5" />
-              </div>
+            <div key={entry.id} className="flex items-start gap-2.5 text-[11px]">
+              <span className="font-mono text-[10px] text-[var(--text-muted)] shrink-0 mt-0.5">{fmt(entry.timestamp)}</span>
               <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-zinc-600">{fmt(entry.timestamp)}</span>
-                  <span className="text-amber-400/80 font-medium">{entry.stage}</span>
-                </div>
-                <p className="text-zinc-400 leading-relaxed">{entry.details}</p>
+                <span className="font-semibold text-[var(--text-primary)] mr-1.5 font-mono text-[10px]">[{entry.stage}]</span>
+                <span className="text-[var(--text-secondary)] leading-relaxed">{entry.details}</span>
               </div>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Timestamps */}
-      <div className="flex items-center gap-4 px-5 pb-3 text-xs text-zinc-600">
-        <span>Sent: {fmt(order.timestampSent)}</span>
-        <span>Acked: {fmt(order.timestampAcked)}</span>
-        <span>Venue: {fmt(order.lastVenueTimestamp)}</span>
-      </div>
-
-      {/* Actions */}
-      <div className="flex gap-2 px-5 pb-5">
+      {/* Footer Actions */}
+      <div className="p-3 bg-[var(--bg-elevated)] border-t border-[var(--border)] flex items-center gap-2">
         {isUnresolved && (
           <button
             onClick={onReconcile}
             disabled={isReconciling}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-semibold hover:bg-amber-500/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="btn btn-brand btn-sm flex-1"
           >
-            {isReconciling
-              ? <><Loader2 className="w-4 h-4 animate-spin" /> Reconciling…</>
-              : <><RefreshCw className="w-4 h-4" /> Reconcile with Venue</>}
+            {isReconciling ? (
+              <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Querying Venue Ledger…</>
+            ) : (
+              <><RefreshCw className="w-3.5 h-3.5" /> Reconcile with Venue</>
+            )}
           </button>
         )}
+
         {canClose && (
           <button
             onClick={onConfirmClose}
-            className="flex-1 py-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 font-semibold hover:bg-rose-500/25 transition-colors"
+            className="btn btn-red btn-sm flex-1"
           >
-            Confirm Close Remaining
+            Close Remaining ({order.remainingQty})
           </button>
         )}
+
         {isFilled && (
-          <div className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 font-semibold">
-            <CheckCircle2 className="w-4 h-4" /> Fully Settled
+          <div className="flex-1 flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-[var(--green-dim)] text-[var(--green)] text-[12px] font-semibold">
+            <CheckCircle2 className="w-3.5 h-3.5" />
+            <span>Position Fully Liquidated & Settled</span>
           </div>
         )}
       </div>

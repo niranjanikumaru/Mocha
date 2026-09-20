@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import Header from '../components/Header';
+import ContractSidebar from '../components/ContractSidebar';
 import PreTradeExplainer from '../components/PreTradeExplainer';
 import MarginHealthIndicator from '../components/MarginHealthIndicator';
 import TransactionRecoveryPanel from '../components/TransactionRecoveryPanel';
@@ -18,10 +19,12 @@ import {
   ContractSymbol, PostTradeSurvey, MarginMetrics,
 } from '../types/trading';
 
+import { TrendingUp, TrendingDown, Info, ShieldCheck, Zap, ArrowUpRight, ArrowDownRight, Layers, Sliders } from 'lucide-react';
+
 const DEFAULT_SYMBOL: ContractSymbol = 'NVDA-PERP';
 const INR_RATE = 86.85;
 
-// ── Performance benchmark targets ─────────────────────────────────────────
+// Performance benchmark targets
 const BENCH = {
   TICK_INTERVAL_MS: 8,        // margin recalculation: < 10 ms target
   STALE_THRESHOLD_MS: 500,    // stale data masking: < 500 ms target
@@ -42,7 +45,6 @@ export default function TradingTerminal() {
   const [markPrice, setMarkPrice] = useState(INITIAL_MARK_PRICES[DEFAULT_SYMBOL]);
   const [prevMarkPrice, setPrevMarkPrice] = useState<number | undefined>(undefined);
   const [feedTimestamp, setFeedTimestamp] = useState(Date.now());
-  const feedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Position & account ─────────────────────────────────────────
   const [position, setPosition] = useState<Position | null>(null);
@@ -86,6 +88,13 @@ export default function TradingTerminal() {
   useEffect(() => { markPriceRef.current = markPrice; }, [markPrice]);
   useEffect(() => { feedTimestampRef.current = feedTimestamp; }, [feedTimestamp]);
   useEffect(() => { prevMarkPriceRef.current = prevMarkPrice; }, [prevMarkPrice]);
+
+  // Sync mark price when symbol changes
+  useEffect(() => {
+    const basePrice = INITIAL_MARK_PRICES[symbol];
+    setMarkPrice(basePrice);
+    setFeedTimestamp(Date.now());
+  }, [symbol]);
 
   // ── High-frequency margin tick loop (< 10ms target) ─────────────
   useEffect(() => {
@@ -180,7 +189,6 @@ export default function TradingTerminal() {
       if (!position) return;
       const t0 = performance.now();
       const order = submitOrder(position.symbol, 'SELL', position.quantity, markPrice, { simulateAckDrop: true, simulatePartialFill: true });
-      // Ledger write latency: time to commit request ID + timestamp + qty
       const writeMs = Math.round((performance.now() - t0) * 100) / 100;
       setLedgerWriteMs(writeMs);
       setActiveOrder(order);
@@ -188,7 +196,6 @@ export default function TradingTerminal() {
     }
 
     if (step === 'SHOW_UNRESOLVED') {
-      // try a duplicate click — should be blocked
       if (activeOrder?.status === 'ACK_LOST_PENDING_RECON') {
         setDuplicateAttempts((n) => n + 1);
       }
@@ -198,7 +205,6 @@ export default function TradingTerminal() {
       if (!activeOrder) return;
       const start = performance.now();
       setIsReconciling(true);
-      // Sub-100ms reconciliation target: 80ms simulated network round-trip
       setTimeout(() => {
         const reconciled = reconcileOrder(activeOrder.requestId);
         const elapsed = Math.round(performance.now() - start);
@@ -233,11 +239,9 @@ export default function TradingTerminal() {
         timestamp: Date.now(),
       };
 
-      // First payment
       const result1 = processPaymentWebhook(payload, balance);
       if (result1.credited) setBalance(result1.balance);
 
-      // Duplicate replay
       const result2 = processPaymentWebhook({ ...payload, paymentId: 'PAY-' + makeId() }, result1.balance);
       if (result2.deduped) setDupPaymentsBlocked((n) => n + 1);
     }
@@ -278,78 +282,124 @@ export default function TradingTerminal() {
   }
 
   const contract = CONTRACT_CATALOG[symbol];
+  const isPosShocked = prevMarkPrice && markPrice < prevMarkPrice;
 
   return (
-    <div className="min-h-screen trading-bg text-zinc-100">
-      {/* Header */}
+    <div className="terminal-root">
+      {/* ── Top Header ───────────────────────────────────────── */}
       <Header balance={balance} feedAge={feedAge} isSimulated={isSimMode} />
 
-      {/* Main layout */}
-      <div className="max-w-7xl mx-auto px-4 py-6 grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
+      {/* ── Left Sidebar (Markets & Account) ──────────────────── */}
+      <ContractSidebar
+        selectedSymbol={symbol}
+        onSelect={setSymbol}
+        position={position}
+        balance={balance}
+        onOpenExplainer={() => setShowExplainer(true)}
+      />
 
-        {/* Left: Position terminal */}
-        <div className="space-y-5">
+      {/* ── Center Main Panel ─────────────────────────────────── */}
+      <main className="terminal-main p-4 space-y-4 bg-[var(--bg-base)]">
 
-          {/* Position selector bar */}
-          <div className="glass-card rounded-2xl p-5 slide-up">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h1 className="text-white font-bold text-xl">Position Screen</h1>
-                <p className="text-zinc-500 text-xs mt-0.5">
-                  {contract.underlyingName} · Perpetual Futures · {isSimMode ? 'Simulation' : 'Live'}
-                </p>
+        {/* Contract Ticker Strip */}
+        <div className="card p-3.5 flex flex-wrap items-center justify-between gap-4 bg-[var(--bg-surface)]">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[var(--brand-dim)] flex items-center justify-center font-bold text-[13px] text-[var(--brand)]">
+              {contract.underlyingTicker.slice(0, 2)}
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-[16px] font-bold text-[var(--text-primary)] tracking-tight">
+                  {contract.underlyingTicker} Perpetual
+                </h1>
+                <span className="badge badge-brand">USD Cash-Settled</span>
               </div>
-              <button
-                onClick={() => setShowExplainer(true)}
-                className="px-4 py-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400 text-sm font-semibold hover:bg-amber-500/20 transition-colors"
-              >
-                Understand This Contract
-              </button>
+              <p className="text-[11px] text-[var(--text-secondary)]">
+                {contract.underlyingName} · Max {contract.maxLeverage}× Leverage · 8h Funding
+              </p>
             </div>
-
-            {/* Contract explainer row */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-              {[
-                ['Contract', `${symbol}`],
-                ['Leverage', `${leverage}×`],
-                ['Mark Price', `$${markPrice.toFixed(2)}`],
-                ['Maintenance Margin', `${(contract.maintenanceMarginRate * 100).toFixed(0)}%`],
-              ].map(([k, v]) => (
-                <div key={k} className="bg-zinc-800/60 rounded-xl px-3 py-2 border border-zinc-700">
-                  <p className="text-zinc-500">{k}</p>
-                  <p className="text-white font-semibold mt-0.5">{v}</p>
-                </div>
-              ))}
-            </div>
-            <p className="text-zinc-600 text-xs mt-2 italic">
-              ⚠ All prices are fictional sample data for prototype demonstration. Not a real trading venue.
-            </p>
           </div>
 
-          {/* Open position button (when no position) */}
-          {!position && (
-            <div className="glass-card rounded-2xl p-8 flex flex-col items-center justify-center gap-4 border-dashed border-zinc-700 slide-up">
-              <p className="text-zinc-500 text-sm">No open position. Use the demo controller or open manually.</p>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowExplainer(true)}
-                  className="px-5 py-2.5 rounded-xl border border-zinc-700 text-zinc-300 text-sm hover:bg-zinc-800 transition-colors"
-                >
-                  Learn First
-                </button>
-                <button
-                  onClick={() => handleDemoStep('OPEN_POSITION')}
-                  className="px-5 py-2.5 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-400 font-semibold text-sm hover:bg-amber-500/25 transition-colors"
-                >
-                  Open Simulation Position
-                </button>
-              </div>
+          {/* Quick price stats */}
+          <div className="flex items-center gap-6">
+            <div>
+              <span className="stat-label">Mark Price</span>
+              <p className="text-[18px] font-mono font-bold text-[var(--text-primary)] price-display">
+                ${markPrice.toFixed(2)}
+              </p>
             </div>
-          )}
+            <div>
+              <span className="stat-label">Est. 24h</span>
+              <p className="text-[13px] font-mono font-semibold text-[var(--green)] flex items-center gap-0.5">
+                <ArrowUpRight className="w-3.5 h-3.5" /> +2.4%
+              </p>
+            </div>
+            <div>
+              <span className="stat-label">Funding (8h)</span>
+              <p className="text-[13px] font-mono font-semibold text-[var(--brand)]">
+                0.0100%
+              </p>
+            </div>
+            <button
+              onClick={() => setShowExplainer(true)}
+              className="btn btn-ghost btn-sm"
+            >
+              <Info className="w-3.5 h-3.5 text-[var(--brand)]" />
+              <span>Contract Rules</span>
+            </button>
+          </div>
+        </div>
 
-          {/* Active position display */}
-          {position && marginMetrics && (
-            <div className="slide-up">
+        {/* Mini Price & Depth Bar (Kalshi aesthetic) */}
+        <div className="card p-3 bg-[var(--bg-surface)] flex items-center justify-between gap-4 text-[12px]">
+          <div className="flex items-center gap-3">
+            <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-muted)]">Order Book</span>
+            <div className="flex items-center gap-2 font-mono">
+              <span className="text-[var(--green)] font-semibold">${(markPrice - 0.05).toFixed(2)}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">Bid</span>
+              <span className="text-[var(--text-muted)]">/</span>
+              <span className="text-[var(--red)] font-semibold">${(markPrice + 0.05).toFixed(2)}</span>
+              <span className="text-[10px] text-[var(--text-muted)]">Ask</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 text-[11px] text-[var(--text-secondary)] font-mono">
+            <span>24h Vol: <strong className="text-[var(--text-primary)]">$14.2M</strong></span>
+            <span>Open Interest: <strong className="text-[var(--text-primary)]">8,450 Lots</strong></span>
+          </div>
+        </div>
+
+        {/* Active Position / Zero State */}
+        {!position ? (
+          <div className="card p-8 text-center bg-[var(--bg-surface)] border-dashed border-[var(--border)] space-y-3">
+            <div className="w-10 h-10 rounded-full bg-[var(--brand-dim)] text-[var(--brand)] flex items-center justify-center mx-auto">
+              <Layers className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">No Active Position on {symbol}</h3>
+              <p className="text-[12px] text-[var(--text-secondary)] mt-1 max-w-md mx-auto">
+                Explore perpetual exposure with visible margin safety and automated transaction reconciliation.
+              </p>
+            </div>
+            <div className="flex justify-center gap-2 pt-2">
+              <button
+                onClick={() => setShowExplainer(true)}
+                className="btn btn-ghost btn-sm"
+              >
+                Learn Contract Rules
+              </button>
+              <button
+                onClick={() => handleDemoStep('OPEN_POSITION')}
+                className="btn btn-brand btn-sm"
+              >
+                <Zap className="w-3.5 h-3.5" />
+                Open 5× Simulated Position
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4 fade-in">
+            {/* Real-time Explainable Margin-Health Indicator */}
+            {marginMetrics && (
               <MarginHealthIndicator
                 metrics={marginMetrics}
                 position={position}
@@ -363,62 +413,40 @@ export default function TradingTerminal() {
                 }}
                 onReview={() => setShowExplainer(true)}
               />
-            </div>
-          )}
-
-          {/* Transaction recovery */}
-          {(activeOrder || position) && (
-            <div className="slide-up">
-              <p className="text-zinc-500 text-xs uppercase tracking-wider mb-2 font-medium px-1">Transaction Recovery</p>
-              <TransactionRecoveryPanel
-                order={activeOrder}
-                onReconcile={handleReconcile}
-                onConfirmClose={handleClosePosition}
-                isReconciling={isReconciling}
-                duplicateAttempts={duplicateAttempts}
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Right: Judge Demo Controller */}
-        <div className="space-y-5">
-          <JudgeDemoController
-            currentStep={demoStep}
-            metrics={{
-              reconciliationMs: reconTimeMs,
-              duplicatesBlocked: dupPaymentsBlocked,
-              staleDataDetections: staleDetections,
-              ledgerWriteMs,
-              lastTickMs,
-            }}
-            onStep={handleDemoStep}
-          />
-
-          {/* Account summary */}
-          <div className="glass-card rounded-2xl p-4 border border-zinc-800">
-            <p className="text-zinc-500 text-xs uppercase tracking-wider mb-3 font-medium">Account Summary</p>
-            <div className="space-y-2 text-sm">
-              {[
-                ['Total Equity', `$${balance.totalEquityUsd.toFixed(2)}`],
-                ['Available', `$${balance.availableUsd.toFixed(2)}`],
-                ['Committed Margin', `$${balance.committedMarginUsd.toFixed(2)}`],
-              ].map(([k, v]) => (
-                <div key={k} className="flex justify-between">
-                  <span className="text-zinc-400">{k}</span>
-                  <span className="text-white font-medium">{v}</span>
-                </div>
-              ))}
-              <div className="border-t border-zinc-800 pt-2 text-xs text-zinc-500 flex justify-between">
-                <span>Available (INR est.)</span>
-                <span className="text-zinc-300">₹{(balance.availableUsd * INR_RATE).toFixed(0)}</span>
-              </div>
-            </div>
+            )}
           </div>
-        </div>
-      </div>
+        )}
 
-      {/* Pre-trade explainer modal */}
+        {/* Transaction Recovery Panel (Always accessible when orders occur) */}
+        {(activeOrder || position) && (
+          <div className="fade-in space-y-1">
+            <TransactionRecoveryPanel
+              order={activeOrder}
+              onReconcile={handleReconcile}
+              onConfirmClose={handleClosePosition}
+              isReconciling={isReconciling}
+              duplicateAttempts={duplicateAttempts}
+            />
+          </div>
+        )}
+      </main>
+
+      {/* ── Right Panel (Judge Demo & SLA Benchmarks) ─────────── */}
+      <aside className="terminal-panel">
+        <JudgeDemoController
+          currentStep={demoStep}
+          metrics={{
+            reconciliationMs: reconTimeMs,
+            duplicatesBlocked: dupPaymentsBlocked,
+            staleDataDetections: staleDetections,
+            ledgerWriteMs,
+            lastTickMs,
+          }}
+          onStep={handleDemoStep}
+        />
+      </aside>
+
+      {/* ── Modals ────────────────────────────────────────────── */}
       {showExplainer && (
         <PreTradeExplainer
           selectedSymbol={symbol}
@@ -427,12 +455,15 @@ export default function TradingTerminal() {
           onLeverageChange={setLeverage}
           quantity={quantity}
           onQuantityChange={setQuantity}
-          onOpenSimulation={() => { setIsSimMode(true); setShowExplainer(false); handleDemoStep('OPEN_POSITION'); }}
+          onOpenSimulation={() => {
+            setIsSimMode(true);
+            setShowExplainer(false);
+            handleDemoStep('OPEN_POSITION');
+          }}
           onClose={() => setShowExplainer(false)}
         />
       )}
 
-      {/* Post-trade receipt modal */}
       {showReceipt && completedOrder && (
         <PostTradeReceipt
           order={completedOrder}
