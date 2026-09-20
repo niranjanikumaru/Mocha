@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { UserAccountBalance } from '../types/trading';
-import { TrendingUp, Bell, Settings, WifiOff } from 'lucide-react';
+import { TrendingUp, Bell, Settings, WifiOff, ShieldCheck } from 'lucide-react';
 import GlowPulse from './ui/glow-pulse';
 import ShimmerText from './ui/shimmer-text';
 
@@ -60,6 +60,16 @@ export default function Header({ balance, feedAge, isSimulated }: HeaderProps) {
             <GlowPulse color="brand" size={8} />
             <span>Market Night</span>
             <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">CREW PASS</span>
+          </motion.a>
+          <motion.a
+            href="/contract-rules"
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-amber-400 border border-amber-500/30 hover:bg-[rgba(245,158,11,0.15)] transition-all ml-1"
+          >
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
+            <span>Contract Rules</span>
+            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">SECTION 3</span>
           </motion.a>
         </nav>
       </div>

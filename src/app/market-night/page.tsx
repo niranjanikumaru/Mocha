@@ -170,7 +170,15 @@ export default function MarketNightPage() {
             className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)] hover:text-white transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Trading Terminal</span>
+            <span>Trading Terminal</span>
+          </Link>
+
+          <Link
+            href="/contract-rules"
+            className="hidden sm:flex items-center gap-1.5 text-[12px] text-amber-400 hover:text-amber-300 transition-colors"
+          >
+            <Shield className="w-3.5 h-3.5" />
+            <span>Contract Rules</span>
           </Link>
 
           <div className="w-px h-4 bg-[var(--border)] hidden sm:block" />
