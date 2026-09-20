@@ -35,6 +35,14 @@ export default function Header({ balance, feedAge, isSimulated }: HeaderProps) {
               {tab}
             </button>
           ))}
+          <a
+            href="/market-night"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--brand-dim)] text-[var(--brand)] border border-[var(--brand-border)] hover:bg-[rgba(245,158,11,0.2)] transition-all ml-2"
+          >
+            <span className="w-2 h-2 rounded-full bg-[var(--brand)] animate-pulse" />
+            <span>Market Night</span>
+            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">CREW PASS</span>
+          </a>
         </nav>
       </div>
 

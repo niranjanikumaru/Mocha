@@ -301,6 +301,22 @@ export default function TradingTerminal() {
       {/* ── Center Main Panel ─────────────────────────────────── */}
       <main className="terminal-main p-4 space-y-4 bg-[var(--bg-base)]">
 
+        {/* Market Night Crew Pass Promotion Banner */}
+        <div className="card p-3 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-interactive)] to-[var(--bg-surface)] border border-[var(--brand-border)] flex flex-wrap items-center justify-between gap-3 text-[12px]">
+          <div className="flex items-center gap-2.5">
+            <span className="w-2 h-2 rounded-full bg-[var(--brand)] animate-pulse" />
+            <span className="font-bold text-[var(--brand)]">Tonight’s Market Night:</span>
+            <span className="text-[var(--text-primary)] font-semibold">“Bring your four. Unlock tonight’s Crew Pass.”</span>
+            <span className="text-[var(--text-secondary)] hidden md:inline">— Exclusive scenario, team report & guest AMA.</span>
+          </div>
+          <a
+            href="/market-night"
+            className="btn btn-brand btn-sm py-1 px-3 text-[11px] font-bold shrink-0"
+          >
+            <span>Join with Your Crew</span>
+          </a>
+        </div>
+
         {/* Contract Ticker Strip */}
         <div className="card p-3.5 flex flex-wrap items-center justify-between gap-4 bg-[var(--bg-surface)]">
           <div className="flex items-center gap-3">
