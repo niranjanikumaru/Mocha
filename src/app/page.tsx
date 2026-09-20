@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import Header from '../components/Header';
 import ContractSidebar from '../components/ContractSidebar';
 import PreTradeExplainer from '../components/PreTradeExplainer';
@@ -8,6 +9,10 @@ import MarginHealthIndicator from '../components/MarginHealthIndicator';
 import TransactionRecoveryPanel from '../components/TransactionRecoveryPanel';
 import PostTradeReceipt from '../components/PostTradeReceipt';
 import JudgeDemoController, { DemoStep } from '../components/JudgeDemoController';
+import AnimatedButton from '../components/ui/animated-button';
+import GlowPulse from '../components/ui/glow-pulse';
+import ShimmerText from '../components/ui/shimmer-text';
+import AuroraBackground from '../components/ui/aurora-background';
 
 import { CONTRACT_CATALOG, INITIAL_MARK_PRICES } from '../lib/contracts';
 import { calcMarginMetrics } from '../lib/marginCalculator';
@@ -299,23 +304,30 @@ export default function TradingTerminal() {
       />
 
       {/* ── Center Main Panel ─────────────────────────────────── */}
-      <main className="terminal-main p-4 space-y-4 bg-[var(--bg-base)]">
+      <main className="terminal-main p-4 space-y-4 bg-[var(--bg-base)] relative overflow-hidden">
+        <AuroraBackground />
 
         {/* Market Night Crew Pass Promotion Banner */}
-        <div className="card p-3 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-interactive)] to-[var(--bg-surface)] border border-[var(--brand-border)] flex flex-wrap items-center justify-between gap-3 text-[12px]">
+        <motion.div
+          initial={{ opacity: 0, y: -6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="card p-3 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-interactive)] to-[var(--bg-surface)] border border-[var(--brand-border)] flex flex-wrap items-center justify-between gap-3 text-[12px]"
+        >
           <div className="flex items-center gap-2.5">
-            <span className="w-2 h-2 rounded-full bg-[var(--brand)] animate-pulse" />
+            <GlowPulse color="brand" size={8} />
             <span className="font-bold text-[var(--brand)]">Tonight’s Market Night:</span>
-            <span className="text-[var(--text-primary)] font-semibold">“Bring your four. Unlock tonight’s Crew Pass.”</span>
+            <ShimmerText className="font-semibold text-[var(--text-primary)]">
+              “Bring your four. Unlock tonight’s Crew Pass.”
+            </ShimmerText>
             <span className="text-[var(--text-secondary)] hidden md:inline">— Exclusive scenario, team report & guest AMA.</span>
           </div>
-          <a
-            href="/market-night"
-            className="btn btn-brand btn-sm py-1 px-3 text-[11px] font-bold shrink-0"
-          >
-            <span>Join with Your Crew</span>
+          <a href="/market-night">
+            <AnimatedButton variant="primary" size="sm" className="py-1 px-3 text-[11px] font-bold shrink-0">
+              Join with Your Crew
+            </AnimatedButton>
           </a>
-        </div>
+        </motion.div>
 
         {/* Contract Ticker Strip */}
         <div className="card p-3.5 flex flex-wrap items-center justify-between gap-4 bg-[var(--bg-surface)]">
@@ -397,19 +409,21 @@ export default function TradingTerminal() {
               </p>
             </div>
             <div className="flex justify-center gap-2 pt-2">
-              <button
+              <AnimatedButton
+                variant="ghost"
+                size="sm"
                 onClick={() => setShowExplainer(true)}
-                className="btn btn-ghost btn-sm"
               >
                 Learn Contract Rules
-              </button>
-              <button
+              </AnimatedButton>
+              <AnimatedButton
+                variant="primary"
+                size="sm"
                 onClick={() => handleDemoStep('OPEN_POSITION')}
-                className="btn btn-brand btn-sm"
               >
-                <Zap className="w-3.5 h-3.5" />
+                <Zap className="w-3.5 h-3.5 mr-1" />
                 Open 5× Simulated Position
-              </button>
+              </AnimatedButton>
             </div>
           </div>
         ) : (

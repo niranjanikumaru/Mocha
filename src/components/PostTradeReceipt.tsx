@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { OrderStateRecord, UserAccountBalance, PostTradeSurvey } from '../types/trading';
 import { CheckCircle2, Download, MessageSquare, X, ShieldCheck, ArrowRight } from 'lucide-react';
+import { BorderBeam } from './ui/border-beam';
+import AnimatedButton from './ui/animated-button';
+import SpotlightCard from './ui/spotlight-card';
 
 interface PostTradeReceiptProps {
   order: OrderStateRecord;
@@ -47,8 +51,20 @@ export default function PostTradeReceipt({ order, balance, onSurveySubmit, onDis
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm fade-in">
-      <div className="relative w-full max-w-lg card-elevated shadow-2xl border-[var(--border)] bg-[var(--bg-surface)] overflow-hidden">
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+    >
+      <motion.div
+        initial={{ scale: 0.93, opacity: 0, y: 16 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 8 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+        className="relative w-full max-w-lg card-elevated shadow-2xl border-[var(--border)] bg-[var(--bg-surface)] overflow-hidden"
+      >
+        <BorderBeam colorFrom="#22c55e" colorTo="#16a34a" duration={8} borderWidth={1.5} />
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--border)] bg-[var(--bg-surface)]">
           <div className="flex items-center gap-2.5">
@@ -177,11 +193,16 @@ export default function PostTradeReceipt({ order, balance, onSurveySubmit, onDis
           )}
 
           {/* Dismiss CTA */}
-          <button onClick={onDismiss} className="btn btn-brand btn-full py-2.5 text-[13px]">
+          <AnimatedButton
+            variant="primary"
+            size="md"
+            onClick={onDismiss}
+            className="w-full py-2.5 text-[13px]"
+          >
             Return to Trading Terminal
-          </button>
+          </AnimatedButton>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,8 +1,11 @@
 'use client';
 
+import { motion } from 'framer-motion';
 import { CONTRACT_CATALOG, INITIAL_MARK_PRICES } from '../lib/contracts';
 import { ContractSymbol, Position, UserAccountBalance } from '../types/trading';
-import { TrendingUp, TrendingDown, Plus, ChevronRight } from 'lucide-react';
+import { TrendingUp, TrendingDown, Plus } from 'lucide-react';
+import AnimatedButton from './ui/animated-button';
+import GlowPulse from './ui/glow-pulse';
 
 interface ContractSidebarProps {
   selectedSymbol: ContractSymbol;
@@ -14,7 +17,6 @@ interface ContractSidebarProps {
 
 const SYMBOLS = Object.keys(CONTRACT_CATALOG) as ContractSymbol[];
 
-// Simulated 24h change % for each contract (fictional)
 const MOCK_CHANGE: Record<ContractSymbol, number> = {
   'NVDA-PERP': 2.34,
   'AAPL-PERP': -0.87,
@@ -33,7 +35,7 @@ export default function ContractSidebar({
       <div className="py-3">
         <p className="section-label">Markets</p>
         <div className="mt-1">
-          {SYMBOLS.map((sym) => {
+          {SYMBOLS.map((sym, idx) => {
             const contract = CONTRACT_CATALOG[sym];
             const price = INITIAL_MARK_PRICES[sym];
             const change = MOCK_CHANGE[sym];
@@ -41,13 +43,17 @@ export default function ContractSidebar({
             const isPos = change >= 0;
 
             return (
-              <button
+              <motion.button
                 key={sym}
                 onClick={() => onSelect(sym)}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: idx * 0.05, type: 'spring', stiffness: 300, damping: 25 }}
+                whileHover={{ x: 2, backgroundColor: 'var(--bg-elevated)' }}
                 className={`w-full flex items-center justify-between px-3 py-2.5 transition-colors ${
                   isSelected
                     ? 'bg-[var(--bg-interactive)] border-r-2 border-r-[var(--brand)]'
-                    : 'hover:bg-[var(--bg-elevated)]'
+                    : ''
                 }`}
               >
                 <div className="flex items-center gap-2.5">
@@ -69,7 +75,7 @@ export default function ContractSidebar({
                     {isPos ? '+' : ''}{change.toFixed(2)}%
                   </p>
                 </div>
-              </button>
+              </motion.button>
             );
           })}
         </div>
@@ -79,12 +85,20 @@ export default function ContractSidebar({
 
       {/* Open position summary */}
       {position ? (
-        <div className="py-3">
+        <motion.div
+          className="py-3"
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 300 }}
+        >
           <p className="section-label">Open Position</p>
           <div className="mx-3 mt-2 card p-3 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-[var(--text-secondary)]">{position.symbol}</span>
-              <span className={`badge ${position.side === 'LONG' ? 'badge-green' : 'badge-red'}`}>{position.side}</span>
+              <div className="flex items-center gap-1.5">
+                <GlowPulse color={position.side === 'LONG' ? 'green' : 'red'} size={7} />
+                <span className={`badge ${position.side === 'LONG' ? 'badge-green' : 'badge-red'}`}>{position.side}</span>
+              </div>
             </div>
             <div className="data-row">
               <span className="stat-label">Qty</span>
@@ -99,15 +113,20 @@ export default function ContractSidebar({
               <span className="text-[var(--brand)] font-bold text-[13px]">{position.leverage}×</span>
             </div>
           </div>
-        </div>
+        </motion.div>
       ) : (
         <div className="py-3">
           <p className="section-label">Position</p>
           <div className="mx-3 mt-2">
             <p className="text-[11px] text-[var(--text-muted)] mb-2">No open position</p>
-            <button onClick={onOpenExplainer} className="btn btn-ghost btn-sm btn-full text-left">
+            <AnimatedButton
+              variant="ghost"
+              size="sm"
+              onClick={onOpenExplainer}
+              className="w-full justify-start"
+            >
               <Plus className="w-3.5 h-3.5" /> New Position
-            </button>
+            </AnimatedButton>
           </div>
         </div>
       )}
@@ -124,10 +143,15 @@ export default function ContractSidebar({
             ['Committed', `$${balance.committedMarginUsd.toFixed(2)}`],
             ['INR equiv.', `₹${(balance.availableUsd * balance.inrExchangeRate).toFixed(0)}`],
           ].map(([k, v]) => (
-            <div key={k} className="flex items-center justify-between">
+            <motion.div
+              key={k}
+              className="flex items-center justify-between"
+              whileHover={{ x: 2 }}
+              transition={{ type: 'spring', stiffness: 400 }}
+            >
               <span className="text-[11px] text-[var(--text-secondary)]">{k}</span>
               <span className="text-[12px] font-mono font-semibold text-[var(--text-primary)]">{v}</span>
-            </div>
+            </motion.div>
           ))}
         </div>
       </div>

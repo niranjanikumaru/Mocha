@@ -6,6 +6,8 @@ import {
   Award, Download, MessageSquare, CheckCircle2, FileText,
   Calendar, Shield, Sparkles, Send, ArrowRight, Printer
 } from 'lucide-react';
+import { BorderBeam } from '../ui/border-beam';
+import AnimatedButton from '../ui/animated-button';
 
 interface CrewPassScreenProps {
   team: CrewTeam;
@@ -44,6 +46,7 @@ export default function CrewPassScreen({
     <div className="space-y-6 fade-in">
       {/* Official Gold Crew Pass Card */}
       <div className="card-elevated p-6 bg-gradient-to-br from-[var(--bg-surface)] via-[var(--bg-elevated)] to-[#1c180e] border-2 border-[var(--brand)] rounded-2xl relative overflow-hidden shadow-[0_0_30px_rgba(245,158,11,0.2)]">
+        <BorderBeam size={320} duration={8} delay={0} colorFrom="#f59e0b" colorTo="#ffd700" />
         {/* Glow emblem */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-[var(--brand)] opacity-10 blur-3xl rounded-full pointer-events-none" />
 

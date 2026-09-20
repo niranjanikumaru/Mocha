@@ -1,8 +1,12 @@
 'use client';
 
 import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MarginMetrics, MarginHealthStatus, Position } from '../types/trading';
 import { Shield, ShieldAlert, ShieldOff, WifiOff, TrendingDown, TrendingUp, ChevronDown, ChevronUp, Minus, AlertOctagon, Info } from 'lucide-react';
+import { BorderBeam } from './ui/border-beam';
+import NumberTicker from './ui/number-ticker';
+import SpotlightCard from './ui/spotlight-card';
 
 interface MarginHealthIndicatorProps {
   metrics: MarginMetrics;
@@ -58,7 +62,10 @@ export default function MarginHealthIndicator({ metrics, position, onReduce, onC
   const pnlPositive = metrics.unrealizedPnL >= 0;
 
   return (
-    <div className="card-elevated overflow-hidden">
+    <SpotlightCard className="card-elevated overflow-hidden" spotlightColor={metrics.status === 'NEAR_LIQUIDATION' ? 'rgba(239,68,68,0.07)' : metrics.status === 'REDUCED_BUFFER' ? 'rgba(234,179,8,0.07)' : 'rgba(34,197,94,0.05)'}>
+      {(metrics.status === 'NEAR_LIQUIDATION') && (
+        <BorderBeam colorFrom="#ef4444" colorTo="#f59e0b" duration={4} borderWidth={1.5} />
+      )}
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-surface)]">
         <div className="flex items-center gap-2.5">
@@ -82,9 +89,11 @@ export default function MarginHealthIndicator({ metrics, position, onReduce, onC
       {!isStale && (
         <div className="px-4 pt-3 pb-2 bg-[var(--bg-surface)]">
           <div className="health-track">
-            <div
+            <motion.div
               className={`health-fill ${cfg.barColor}`}
-              style={{ width: `${bufferDisplayPct}%` }}
+              initial={{ width: 0 }}
+              animate={{ width: `${bufferDisplayPct}%` }}
+              transition={{ type: 'spring', stiffness: 80, damping: 18 }}
             />
             {/* Guide markers */}
             <div className="absolute top-0 bottom-0 w-0.5 bg-[var(--red)] opacity-60" style={{ left: '15%' }} title="15% Liquidation trigger" />
@@ -234,6 +243,6 @@ export default function MarginHealthIndicator({ metrics, position, onReduce, onC
           Market Close
         </button>
       </div>
-    </div>
+    </SpotlightCard>
   );
 }

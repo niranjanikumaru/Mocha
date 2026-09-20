@@ -16,6 +16,8 @@ import EventWorkspaceScreen from '../../components/MarketNight/EventWorkspaceScr
 import CrewPassScreen from '../../components/MarketNight/CrewPassScreen';
 import MarketNightCelebration from '../../components/MarketNight/MarketNightCelebration';
 import MarketNightJudgeDemo from '../../components/MarketNight/MarketNightJudgeDemo';
+import RetroGrid from '../../components/ui/retro-grid';
+import AuroraBackground from '../../components/ui/aurora-background';
 
 import {
   TrendingUp, ArrowLeft, Users, Sparkles, FileText,
@@ -155,9 +157,13 @@ export default function MarketNightPage() {
   const isQualified = !!team?.isQualified;
 
   return (
-    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col font-sans">
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex flex-col font-sans relative overflow-x-hidden">
+      {/* VengeanceUI Cybernetic Graphics Background */}
+      <AuroraBackground />
+      <RetroGrid opacity={0.3} cellSize={65} lineColor="rgba(245, 158, 11, 0.12)" />
+
       {/* ── Top Bar ── */}
-      <header className="h-[52px] px-5 bg-[var(--bg-surface)] border-b border-[var(--border)] flex items-center justify-between z-20 shrink-0">
+      <header className="h-[52px] px-5 bg-[var(--bg-surface)]/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between z-20 shrink-0">
         <div className="flex items-center gap-4">
           <Link
             href="/"
@@ -228,7 +234,7 @@ export default function MarketNightPage() {
       </div>
 
       {/* ── Main Content Container ── */}
-      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6">
+      <main className="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 space-y-6 relative z-10">
 
         {activeTab === 'EVENT_DISCOVERY' && (
           <MarketNightEventPage

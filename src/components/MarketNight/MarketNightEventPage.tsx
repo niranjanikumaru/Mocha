@@ -1,11 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { MarketNightEvent, BenefitBundle, MarketNightUser } from '../../types/marketNight';
 import {
   Users, Sparkles, FileText, HelpCircle, Shield, Clock, ArrowRight,
   UserPlus, Compass, CheckCircle2, AlertCircle, Info, Zap
 } from 'lucide-react';
+import AnimatedButton from '../ui/animated-button';
+import { BorderBeam } from '../ui/border-beam';
+import SpotlightCard from '../ui/spotlight-card';
 
 interface MarketNightEventPageProps {
   event: MarketNightEvent;
@@ -41,6 +45,7 @@ export default function MarketNightEventPage({
     <div className="space-y-6 fade-in">
       {/* Hero Offer Banner */}
       <div className="card-elevated p-6 sm:p-8 bg-gradient-to-br from-[var(--bg-surface)] via-[var(--bg-elevated)] to-[var(--bg-interactive)] border-[var(--border)] relative overflow-hidden">
+        <BorderBeam size={250} duration={12} delay={0} colorFrom="#f59e0b" colorTo="#3b82f6" />
         {/* Glow pill */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-[var(--brand)] opacity-10 blur-3xl rounded-full pointer-events-none" />
 
@@ -73,36 +78,44 @@ export default function MarketNightEventPage({
           {/* CTAs */}
           <div className="pt-3 flex flex-wrap items-center gap-3">
             {hasActiveTeam ? (
-              <button
+              <AnimatedButton
+                variant="primary"
+                size="lg"
                 onClick={onGoToLobby}
-                className="btn btn-brand py-3 px-6 text-[14px] font-bold"
+                className="py-3 px-6 text-[14px] font-bold"
               >
                 <span>View Your Team Lobby</span>
-                <ArrowRight className="w-4 h-4" />
-              </button>
+                <ArrowRight className="w-4 h-4 ml-2" />
+              </AnimatedButton>
             ) : (
               <>
-                <button
+                <AnimatedButton
+                  variant="primary"
+                  size="lg"
                   onClick={() => setShowCreateModal(true)}
-                  className="btn btn-brand py-3 px-6 text-[14px] font-bold"
+                  className="py-3 px-6 text-[14px] font-bold"
                 >
-                  <Users className="w-4 h-4" />
+                  <Users className="w-4 h-4 mr-2" />
                   <span>Create a Crew</span>
-                </button>
-                <button
+                </AnimatedButton>
+                <AnimatedButton
+                  variant="ghost"
+                  size="lg"
                   onClick={() => setShowJoinModal(true)}
-                  className="btn btn-ghost py-3 px-5 text-[14px]"
+                  className="py-3 px-5 text-[14px]"
                 >
-                  <UserPlus className="w-4 h-4" />
+                  <UserPlus className="w-4 h-4 mr-2" />
                   <span>Join with Code</span>
-                </button>
-                <button
+                </AnimatedButton>
+                <AnimatedButton
+                  variant="ghost"
+                  size="lg"
                   onClick={onSoloMatch}
-                  className="btn btn-ghost py-3 px-5 text-[14px] text-[var(--brand)] border-[var(--brand-border)]"
+                  className="py-3 px-5 text-[14px] text-[var(--brand)] border border-[var(--brand-border)]"
                 >
-                  <Compass className="w-4 h-4" />
+                  <Compass className="w-4 h-4 mr-2" />
                   <span>Solo? Find Teammates</span>
-                </button>
+                </AnimatedButton>
               </>
             )}
           </div>
@@ -121,7 +134,7 @@ export default function MarketNightEventPage({
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {/* Benefit 1 */}
-          <div className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
+          <SpotlightCard className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
             <div className="w-10 h-10 rounded-lg bg-[var(--brand-dim)] text-[var(--brand)] flex items-center justify-center font-bold">
               <Sparkles className="w-5 h-5" />
             </div>
@@ -134,10 +147,10 @@ export default function MarketNightEventPage({
             <div className="pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--brand)] font-medium">
               ★ Makes completing the team immediately rewarding
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* Benefit 2 */}
-          <div className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
+          <SpotlightCard className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
             <div className="w-10 h-10 rounded-lg bg-[var(--green-dim)] text-[var(--green)] flex items-center justify-center font-bold">
               <FileText className="w-5 h-5" />
             </div>
@@ -150,10 +163,10 @@ export default function MarketNightEventPage({
             <div className="pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--green)] font-medium">
               ★ Creates something structured to keep and share
             </div>
-          </div>
+          </SpotlightCard>
 
           {/* Benefit 3 */}
-          <div className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
+          <SpotlightCard className="card-elevated p-5 space-y-3 bg-[var(--bg-surface)] border-[var(--border)] hover:border-[var(--brand-border)] transition-colors">
             <div className="w-10 h-10 rounded-lg bg-[var(--yellow-dim)] text-[var(--yellow)] flex items-center justify-center font-bold">
               <HelpCircle className="w-5 h-5" />
             </div>
@@ -166,7 +179,7 @@ export default function MarketNightEventPage({
             <div className="pt-2 border-t border-[var(--border-subtle)] text-[11px] text-[var(--yellow)] font-medium">
               ★ Direct access to the fortnightly expert programme
             </div>
-          </div>
+          </SpotlightCard>
         </div>
       </div>
 
