@@ -1,26 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #09090b;
+  --foreground: #fafafa;
+  --card: #111113;
+  --card-border: #27272a;
+  --muted: #71717a;
+  --amber-glow: rgba(245, 158, 11, 0.15);
+  --emerald-glow: rgba(16, 185, 129, 0.15);
+  --rose-glow: rgba(244, 63, 94, 0.15);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+* {
+  box-sizing: border-box;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  color-scheme: dark;
+  scroll-behavior: smooth;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100vh;
+}
+
+code, .font-mono {
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+/* ── Scrollbar ─────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #3f3f46; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #52525b; }
+
+/* ── Glass cards ────────────────────────────────── */
+.glass-card {
+  background: rgba(17, 17, 19, 0.7);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+/* ── Animated gradient background ──────────────── */
+.trading-bg {
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(245, 158, 11, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 40% at 80% 70%, rgba(16, 185, 129, 0.03) 0%, transparent 50%),
+    #09090b;
+}
+
+/* ── Health status glows ────────────────────────── */
+.glow-comfortable { box-shadow: 0 0 24px rgba(16, 185, 129, 0.15), 0 1px 3px rgba(0,0,0,0.5); }
+.glow-reduced { box-shadow: 0 0 24px rgba(245, 158, 11, 0.15), 0 1px 3px rgba(0,0,0,0.5); }
+.glow-liquidation { box-shadow: 0 0 32px rgba(244, 63, 94, 0.25), 0 1px 3px rgba(0,0,0,0.5); }
+
+/* ── Pulse ring for near-liquidation ───────────── */
+@keyframes pulse-ring {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.pulse-danger { animation: pulse-ring 1.5s ease-in-out infinite; }
+
+/* ── Slide-up entry animation ───────────────────── */
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.slide-up { animation: slide-up 0.3s ease-out both; }
+
+/* ── Range input styling ────────────────────────── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: #3f3f46;
+  border-radius: 2px;
+  cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  background: #f59e0b;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.5);
+  transition: box-shadow 0.2s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 12px rgba(245, 158, 11, 0.7);
 }
