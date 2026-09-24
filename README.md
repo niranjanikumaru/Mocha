@@ -1,135 +1,121 @@
-# MochaTrade
+# MochaTrade: Decision Cockpit & Evidence Engine
+### ACM MarketSphere 2026 — Round 2 Prototype
 
-> Institutional-grade, high-resilience derivatives trading terminal, viral growth engine, and modular contract rules architecture built with Next.js 16, React 19, TypeScript, Tailwind CSS, and Vitest.
+> **Internal Decision Tool** built for the MochaTrade executive and growth team to evaluate, price, and operationalize our **Round 1 Strategy**: shifting from high-friction, paid-ad-heavy customer acquisition to a **community-viral Crew Pass engine powered by transparent trust mechanisms**.
 
 ---
 
-## Architecture Overview
+## 0. Executive Summary: What This Prototype Is
 
-MochaTrade is designed around three unified pillars that deliver transparency, transaction resilience, and extensible market scaling:
+In Round 1, our recommendation proposed that MochaTrade compete not by outspending incumbents on paid marketing ($28+ retail CAC in India), but by turning trust into a customer acquisition and retention moat:
+1. **Crew Pass (Mocha Market Night)**: A squad-based (4-trader) community on-ramp lowering CAC through organic viral invites ($K$-factor).
+2. **Transparent Trust Architecture**: Explainable margin buffers, lost-ACK transaction reconciliation, and immutable versioned contract rules that reduce user churn and customer support overhead.
+3. **Optimized Pricing**: Competitive taker fees (e.g. 5 bps) combined with FX spread monetization that maximize 12-month net contribution.
+
+**This prototype is the internal tool MochaTrade leadership uses to model and stress-test that thesis.**
 
 ```
                                ┌───────────────────────────────────────────────────────────┐
-                               │                    MochaTrade Platform                    │
+                               │             MochaTrade Decision Cockpit (`/`)             │
+                               │  Interactive 12-Mo Projections · Scenarios · Optimizers   │
                                └─────────────────────────────┬─────────────────────────────┘
                                                              │
-                ┌────────────────────────────────────────────┼────────────────────────────────────────────┐
-                ▼                                            ▼                                            ▼
-   ┌───────────────────────────┐                ┌───────────────────────────┐                ┌───────────────────────────┐
-   │    1. Trading Terminal    │                │   2. Mocha Market Night   │                │    3. Contract Rules      │
-   │           (`/`)           │                │     (`/market-night`)     │                │    (`/contract-rules`)    │
-   ├───────────────────────────┤                ├───────────────────────────┤                ├───────────────────────────┤
-   │ • Sub-10ms Margin Engine  │                │ • Viral Crew Pass Engine  │                │ • Typed Zod Schema Engine │
-   │ • Lost-ACK Recovery Panel │                │ • 4-Trader Squad Lobby    │                │ • Tested Calculation Mod. │
-   │ • Idempotent Webhooks     │                │ • 3 Collaborative Perks   │                │ • Oracle Fault Injection  │
-   │ • Adverse Shock Simulator │                │ • Market Shock Simulation │                │ • Versioned Audit Ledger  │
-   │ • Live Scripted Demo (6x) │                │ • $2.40 CAC Economics     │                │ • 5-Step Judge Demo Suite │
-   └───────────────────────────┘                └───────────────────────────┘                └───────────────────────────┘
+                 ┌───────────────────────────────────────────┼───────────────────────────────────────────┐
+                 ▼                                           ▼                                           ▼
+  ┌──────────────────────────────┐            ┌──────────────────────────────┐            ┌──────────────────────────────┐
+  │  Proof 1: Trust Terminal     │            │  Proof 2: Market Night       │            │  Proof 3: Contract Rules     │
+  │     (`/proof/terminal`)      │            │   (`/proof/market-night`)    │            │     (`/proof/contracts`)     │
+  ├──────────────────────────────┤            ├──────────────────────────────┤            ├──────────────────────────────┤
+  │ Evidence for Trust Levers    │            │ Evidence for Non-Paid Mix    │            │ Evidence for Expansion Cost  │
+  │ • Explainable Margin Buffer  │            │ • 4-Trader Crew Formation    │            │ • Zod-Validated Rule Engine  │
+  │ • Lost-ACK State Machine     │            │ • Atomic 4th-Member Unlock   │            │ • Immutable Rule Snapshots   │
+  │ • Idempotent Deposit Rails   │            │ • Measured 64.1% Qual. Rate  │            │ • Single-File Scalability    │
+  └──────────────────────────────┘            └──────────────────────────────┘            └──────────────────────────────┘
 ```
 
 ---
 
-## 1. Trading Terminal & Resilient Execution (`/`)
+## 1. Application Map & Features
 
-* **Continuous Margin Health (< 10ms)**: Real-time recalculation of position equity, maintenance margin, buffer ratios, and liquidation prices across four dynamic health states (`COMFORTABLE_BUFFER`, `REDUCED_BUFFER`, `NEAR_LIQUIDATION`, `DATA_STALE`).
-* **Stale Feed Circuit Breaking**: Automatically masks feed metrics if upstream latency exceeds 500ms.
-* **Adverse Scenario Simulation**: Tests price drop shocks (e.g. −7.5%) directly against trader margin buffers.
-* **Lost ACK Transaction Recovery**: If an execution ACK drops over the wire, orders enter `ACK_LOST_PENDING_RECON` rather than allowing blind duplicate submissions.
-* **Sub-100ms Venue Reconciliation**: In-memory venue simulator resolves pending orders and partial fills cleanly.
-* **Idempotent Payment Webhooks**: Prevents double-credit deposit attacks by deduplicating idempotency keys.
-* **Pre- & Post-Trade Explainer**: Interactive trade cost breakdown and post-execution clarity survey.
+### 1.1 Decision Cockpit (`/`) — Primary Tool
+* **Interactive 12-Month Projection Engine**: Pure TypeScript, deterministic model recalculating in $<5\text{ ms}$ upon any parameter change.
+* **Side-by-Side Scenario Comparison**:
+  * **Recommended ✓**: Round 1 thesis (60% paid budget shifted to Crew Pass, 5 bps taker fee, all 5 trust levers active).
+  * **Baseline**: Traditional status quo (paid-marketing heavy, opaque pricing at 10 bps, no trust levers).
+  * **Honest Stress Test**: Negative shock where trust levers fail to alter customer behavior, demonstrating model intellectual honesty.
+* **Trust Ladder ($T \in [0, 1]$)**: Adjust completeness across 5 live trust levers to see their causal impact on deposit conversion, retention, and support ticket rate.
+* **Pricing Optimiser**: Sweeps taker fees ($1\text{ to }20\text{ bps}$) to determine the contribution-maximizing price point and visualizes how higher trust shifts optimal pricing.
+* **Sensitivity Tornado**: Evaluates the top 8 risk factors impacting 12-month net contribution (retention, volume, elasticity, fee level, etc.).
+* **Assumption Ledger**: Full visibility into all model drivers, labeled with provenance (`MEASURED`, `SIMULATED`, `ASSUMED`, `DERIVED`), confidence ratings, and citations.
+* **Interactive Judge Mode**: A 5-step guided tour enabling a concise 6-minute live pitch.
 
----
-
-## 2. Mocha Market Night — "Crew Pass" (`/market-night`)
-
-A community-driven event platform engineered to solve high retail acquisition costs ($2.40 vs $28.00 traditional CAC):
-
-* **4-Trader Crew Formation**: Captains invite friends to assemble 4-member trading squads.
-* **Collaborative Benefit Bundles**:
-  1. *Exclusive Live Market Scenarios*
-  2. *Team Divergence & Consensus Analysis Reports*
-  3. *Priority Guest Trader Q&A Submission*
-* **Multi-Phase Market Shock Game**: Private decision phase $\rightarrow$ surprise market shock reveal $\rightarrow$ consensus debrief and revision.
-* **Interactive Evaluator Controls**: Test presets for 4th-member unlock celebrations, network disconnection/reconnection resilience, and team formation.
+### 1.2 "Proof as Evidence" Screens
+* **`/proof/terminal`**: Interactive trading terminal featuring live explainable margin health cards, adverse price shock simulation, simulated lost-ACK order recovery, and idempotent payment deduplication.
+* **`/proof/market-night`**: The viral 4-person Crew Pass squad lobby and multi-phase market shock simulation.
+* **`/proof/contracts`**: Zod-based contract catalogue, versioned audit records, and oracle fault injection.
 
 ---
 
-## 3. Scalability Through Validated Contract Rules (`/contract-rules`)
+## 2. Model Methodology & Provenance (Audit of Claims)
 
-Extends the platform across new instruments and communities without modifying screen code:
+Every metric in the prototype is clearly categorized to prevent unsubstantiated claims:
 
-| Component | Role & Boundary |
-| :--- | :--- |
-| **Contract Catalogue** | Typed Zod schema (`src/core/catalogue/schema.ts`) validating tick size, lot sizes, fee schedules, funding rates, and margin settings. Inverted margins or missing fields strictly block activation. |
-| **Calculation Modules** | Tested mathematical engine (`src/core/calculations/perpetual.ts`) computing initial/maintenance margin, leverage caps, taker/maker fee schedules, funding carry, and liquidation thresholds. |
-| **Capability-Aware Adapters** | Oracle adapter (`src/core/adapters/providerAdapter.ts`) supporting price streaming, heartbeat tracking, and interactive fault injection. |
-| **Versioned Audit Ledger** | Cryptographic audit ledger (`src/core/versioning/recordStore.ts`) freezing the exact rules and assumptions used in each execution. Publishing rule $v2.0$ updates new previews and lessons while preserving historical $v1.0$ receipts. |
-| **Privacy Separation** | Public lesson simulations and replay sandbox run completely isolated from private account equity. |
-
-### Judge Demonstration Highlights (`/contract-rules`):
-1. **Switch Contracts**: Toggle between `AERO-PERP` (20x leverage) and `NEXUS-PERP` (5x conservative) with **0 lines of screen code changed**.
-2. **Schema Validator**: Load the pre-built "Inverted Margin" or "Missing Fields" templates and verify instant pre-activation rejection.
-3. **Interrupt Price Feed**: Simulate oracle timeout to witness automatic trade halting and `UNAVAILABLE` health state.
-4. **Publish Rule v2.0**: Update funding rules to immediately reflect in new previews while keeping historical receipts locked.
-5. **Verify Privacy Separation**: Test public community lesson replays with zero side-effects on user balances.
+| Metric / Parameter | Value in Model | Provenance | Source / Derivation |
+| :--- | :--- | :--- | :--- |
+| **Crew Qualification Rate** | $64.1\%$ ($41/64$) | `SIMULATED` | Measured from simulated Market Night run (`marketNightEngine.ts`) |
+| **Invite $\rightarrow$ Attendance** | $78.5\%$ | `SIMULATED` | Measured from mock squad formation logs |
+| **FX Conversion Spread** | $0.25\%$ | `SIMULATED` | Contract rule parameter in `lib/contracts.ts` |
+| **Taker Fee (Recommended)** | $5\text{ bps}$ ($0.05\%$) | `ASSUMED` | Benchmarked against retail Indian derivatives (Dhan/Zerodha) |
+| **Traditional Paid CAC** | $\$28.00$ | `ASSUMED` | Benchmark from MoEngage India FinTech Acquisition Report |
+| **Derived Crew CAC** | $\$2.40\text{--}\$6.00$ | `DERIVED` | $\text{CAC}_{\text{crew}} = \frac{\text{Events} \cdot \text{Cost} + \text{Perks}}{\text{Crew Signups}}$ |
+| **Blended CAC** | Dynamic output | `DERIVED` | $\frac{\text{Total Channel Spend}}{\text{Total Signups across Paid, Crew, Organic, Referral}}$ |
+| **LTV / CAC Ratio** | Dynamic output | `DERIVED` | $\text{LTV} = \frac{\text{ARPU}}{1 - r'}$; calculated against blended CAC |
+| **Tick / Calc Latency** | $\sim 0.05\text{--}0.2\text{ ms}$ | `MEASURED` | In-browser `performance.now()` compute duration |
 
 ---
 
-## Proof & Economics Scorecard
-
-| Metric | Target / Benchmark | Result in MochaTrade |
-| :--- | :--- | :--- |
-| **Margin Health Tick** | $< 10\text{ ms}$ | **$8\text{ ms}$ continuous tick loop** |
-| **Data Stale Masking** | $< 500\text{ ms}$ | **$500\text{ ms}$ automatic cutoff** |
-| **Venue Reconciliation** | $< 100\text{ ms}$ | **$\sim 80\text{ ms}$ simulated reconciliation** |
-| **Time to Add 2nd Contract** | $< 5\text{ minutes}$ | **$< 1\text{ minute}$ (data configuration only)** |
-| **Screen Code Changes for New Contract** | $0\text{ lines}$ | **$0\text{ lines}$** |
-| **Invalid Schema Prevention** | $100\%$ | **$100\%$ blocked at registration** |
-| **Acquisition Cost (Crew Pass)** | $< \$5.00$ | **$\$2.40$ vs $\$28.00$ traditional CAC** |
-| **Unit Test Coverage** | $100\%$ of rule modules | **10 / 10 passed with Vitest** |
-
----
-
-## Getting Started
+## 3. Getting Started
 
 ### Prerequisites
 - Node.js $\ge 18.0.0$
 - npm $\ge 9.0.0$
 
-### 1. Install Dependencies
+### 1. Installation
 ```bash
 npm install
 ```
 
-### 2. Run Automated Test Suite
+### 2. Run Test Suite
 ```bash
 npm test
 ```
-Executes all 10 unit tests across perpetual calculations, contract catalogue validation guardrails, and versioned audit record immutability.
+Runs 17 automated unit and invariant tests covering:
+* **Growth Model Invariants**: Funnel monotonicity, determinism, referral $K$-factor limits, sensitivity ordering.
+* **Perpetual Margin Calculations**: Maintenance buffer ratios, liquidation pricing, and stale feed masking.
+* **Contract Validation Guardrails**: Zod schema rejection of inverted margins and incomplete definitions.
+* **Versioned Records**: Immutability of historical receipts across rule bumps ($v1.0 \rightarrow v2.0$).
 
-### 3. Start Local Development Server
+### 3. Start Local Development
 ```bash
 npm run dev
 ```
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Navigate to [http://localhost:3000](http://localhost:3000) for the Decision Cockpit.
 
-### 4. Build for Production
+### 4. Build for Production (Offline Verification)
 ```bash
 npm run build
 ```
-Creates an optimized static production build for all three application routes:
-* `/` — Trading Terminal
-* `/market-night` — Mocha Market Night
-* `/contract-rules` — Contract Rules Engine
+Generates an optimized, statically verified build for all routes (`/`, `/proof/terminal`, `/proof/market-night`, `/proof/contracts`).
 
 ---
 
-## Tech Stack
+## 4. Live Demo Walkthrough (6-Minute Judge Script)
 
-* **Core Framework**: [Next.js 16](https://nextjs.org) (App Router, Turbopack)
-* **Frontend**: [React 19](https://react.dev), TypeScript 5
-* **Validation**: [Zod](https://zod.dev)
-* **Styling**: [Tailwind CSS v4](https://tailwindcss.com), Lucide Icons
-* **Motion & Effects**: [Framer Motion](https://www.framer.com/motion/)
-* **Testing**: [Vitest](https://vitest.dev)
+| Time | Segment | What to Show | Key Point to Say |
+| :--- | :--- | :--- | :--- |
+| **0:00 - 0:30** | **The Thesis** | Open `/` Cockpit, highlight Thesis Banner atop the screen. | *"In Round 1, we argued that MochaTrade must win on trust and community virality, not paid ads. Today, we built the executive tool we use to prove it."* |
+| **0:30 - 1:30** | **Baseline vs Recommended** | Toggle tabs between **Baseline** and **Recommended**. Point to KPI strip. | *"Our baseline paid-acquisition model burns capital at \$28 CAC. Shifting 60% of budget into weekly Crew Passes cuts blended CAC down while accelerating LTV:CAC."* |
+| **1:30 - 2:45** | **Trust $\rightarrow$ Mathematical Mechanism** | Uncheck *Explainable Margin* or *Lost-ACK Recovery* on the Trust Ladder. Watch retention and support costs shift live. Click **See it work** $\rightarrow$ `/proof/terminal`. | *"Trust is not a decorative badge. Here in the code, our Explainable Margin card and Lost-ACK recovery state machine directly reduce trade disputes and user drop-off."* |
+| **2:45 - 3:45** | **Pricing Optimization** | Expand the **Pricing Optimiser** card. Drag the taker fee slider. | *"Because trust reduces customer fee sensitivity, the optimal taker fee shifts from 4 bps to 6 bps, delivering an additional contribution cushion."* |
+| **3:45 - 4:45** | **Honest Stress Test** | Select the **Honest Stress** scenario tab. Review the Sensitivity Tornado. | *"To remain intellectually honest: if trust levers fail to alter customer behavior, Baseline wins. The Tornado shows retention is our biggest assumption risk."* |
+| **4:45 - 5:30** | **Executive Decision** | Read the auto-generated **Decision Panel** recommendation. | *"The tool synthesizes our call: set taker fee at 5 bps, run 4 Market Nights monthly, and invest in transaction recovery to hit breakeven by month 7."* |

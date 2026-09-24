@@ -1,17 +1,14 @@
 import { Position, MarginMetrics, MarginHealthStatus, AdverseScenarioResult, ContractSymbol } from '../types/trading';
 import { CONTRACT_CATALOG } from './contracts';
 
+import { RISK_POLICY, evaluateRiskHealth } from '../core/risk/riskPolicy';
+
 // Version label for auditability
 export const MARGIN_CALCULATOR_VERSION = 'v2.1-fictional-sample';
 
-// ─── Health thresholds (sample / fictional) ────────────────────────────────
-export const HEALTH_THRESHOLDS = {
-  COMFORTABLE_BUFFER: 0.40,  // bufferRatio > 40%
-  REDUCED_BUFFER: 0.15,      // 15% <= bufferRatio <= 40%
-  // < 15% → NEAR_LIQUIDATION
-} as const;
-
-export const DATA_STALE_MS = 3000; // marks feed stale after 3s
+// ─── Health thresholds (imported from central riskPolicy) ───────────────────
+export const HEALTH_THRESHOLDS = RISK_POLICY.THRESHOLDS;
+export const DATA_STALE_MS = RISK_POLICY.FEED_STALE_THRESHOLD_MS;
 
 export function calcMarginMetrics(
   position: Position,

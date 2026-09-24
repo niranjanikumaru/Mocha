@@ -1,510 +1,771 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useMemo, useCallback } from 'react';
+import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
-import Header from '../components/Header';
-import ContractSidebar from '../components/ContractSidebar';
-import PreTradeExplainer from '../components/PreTradeExplainer';
-import MarginHealthIndicator from '../components/MarginHealthIndicator';
-import TransactionRecoveryPanel from '../components/TransactionRecoveryPanel';
-import PostTradeReceipt from '../components/PostTradeReceipt';
-import JudgeDemoController, { DemoStep } from '../components/JudgeDemoController';
-import AnimatedButton from '../components/ui/animated-button';
-import GlowPulse from '../components/ui/glow-pulse';
-import ShimmerText from '../components/ui/shimmer-text';
-import AuroraBackground from '../components/ui/aurora-background';
-
-import { CONTRACT_CATALOG, INITIAL_MARK_PRICES } from '../lib/contracts';
-import { calcMarginMetrics } from '../lib/marginCalculator';
-import { submitOrder, reconcileOrder, resetVenue } from '../lib/simulationVenue';
-import { processPaymentWebhook, resetPaymentService } from '../lib/paymentService';
+import {
+  TrendingUp, TrendingDown, ChevronDown, ChevronUp,
+  Shield, Zap, Users, BarChart3, Target, AlertTriangle,
+  ArrowRight, Info, ExternalLink, RotateCcw, Plus,
+} from 'lucide-react';
 
 import {
-  Position, UserAccountBalance, OrderStateRecord,
-  ContractSymbol, PostTradeSurvey, MarginMetrics,
-} from '../types/trading';
+  runModel, sweepPricing, sensitivityTornado,
+  ModelInputs, DEFAULT_TRUST_LEVERS, TrustLever,
+} from '../core/growth/model';
+import {
+  PRESET_SCENARIOS, BASELINE_INPUTS, RECOMMENDED_INPUTS, Scenario,
+} from '../core/growth/scenarios';
 
-import { TrendingUp, TrendingDown, Info, ShieldCheck, Zap, ArrowUpRight, ArrowDownRight, Layers, Sliders } from 'lucide-react';
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
-const DEFAULT_SYMBOL: ContractSymbol = 'NVDA-PERP';
-const INR_RATE = 86.85;
+function fmt(n: number, decimals = 0) {
+  if (!isFinite(n) || isNaN(n)) return '—';
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+function fmtUsd(n: number) {
+  if (!isFinite(n) || isNaN(n)) return '—';
+  if (Math.abs(n) >= 1000) return '$' + fmt(n / 1000, 1) + 'K';
+  return '$' + fmt(n, 0);
+}
+function fmtPct(n: number) { return fmt(n * 100, 1) + '%'; }
 
-// Performance benchmark targets
-const BENCH = {
-  TICK_INTERVAL_MS: 8,        // margin recalculation: < 10 ms target
-  STALE_THRESHOLD_MS: 500,    // stale data masking: < 500 ms target
-  RECON_SIMULATED_MS: 80,     // reconciliation: < 100 ms target
-} as const;
+type ProvenanceBadge = { label: string; color: string };
+const PROVENANCE: Record<string, ProvenanceBadge> = {
+  MEASURED: { label: 'MEASURED', color: '#22c55e' },
+  SIMULATED: { label: 'SIMULATED', color: '#f59e0b' },
+  ASSUMED: { label: 'ASSUMED', color: '#7e7e9a' },
+  DERIVED: { label: 'DERIVED', color: '#60a5fa' },
+};
 
-function makeId() {
-  return Math.random().toString(36).slice(2, 10).toUpperCase();
+function ProvenanceChip({ type }: { type: string }) {
+  const b = PROVENANCE[type] || PROVENANCE.ASSUMED;
+  return (
+    <span style={{ color: b.color, borderColor: b.color + '44' }}
+      className="text-[9px] font-bold border rounded px-1 py-0.5 tracking-widest">
+      {b.label}
+    </span>
+  );
 }
 
-export default function TradingTerminal() {
-  // ── Config state ───────────────────────────────────────────────
-  const [symbol, setSymbol] = useState<ContractSymbol>(DEFAULT_SYMBOL);
-  const [leverage, setLeverage] = useState(5);
-  const [quantity, setQuantity] = useState(100);
+function KpiCard({ label, value, sub, positive, provenance }: {
+  label: string; value: string; sub?: string;
+  positive?: boolean | null; provenance?: string;
+}) {
+  return (
+    <div className="card p-3 bg-[var(--bg-surface)] space-y-0.5">
+      <div className="flex items-center justify-between">
+        <span className="text-[10px] text-[var(--text-secondary)] uppercase tracking-wider">{label}</span>
+        {provenance && <ProvenanceChip type={provenance} />}
+      </div>
+      <p className={`text-[18px] font-mono font-bold ${positive === true ? 'text-[var(--green)]' : positive === false ? 'text-[var(--red)]' : 'text-[var(--text-primary)]'}`}>
+        {value}
+      </p>
+      {sub && <p className="text-[10px] text-[var(--text-muted)]">{sub}</p>}
+    </div>
+  );
+}
 
-  // ── Market data ────────────────────────────────────────────────
-  const [markPrice, setMarkPrice] = useState(INITIAL_MARK_PRICES[DEFAULT_SYMBOL]);
-  const [prevMarkPrice, setPrevMarkPrice] = useState<number | undefined>(undefined);
-  const [feedTimestamp, setFeedTimestamp] = useState(Date.now());
+export default function DecisionCockpit() {
+  const [scenarios, setScenarios] = useState<Scenario[]>([...PRESET_SCENARIOS]);
+  const [activeScenarioId, setActiveScenarioId] = useState('recommended');
+  const [compareScenarioId, setCompareScenarioId] = useState<string | null>('baseline');
+  const [showLedger, setShowLedger] = useState(false);
+  const [showSensitivity, setShowSensitivity] = useState(false);
+  const [showOptimizer, setShowOptimizer] = useState(false);
+  const [showJudgeMode, setShowJudgeMode] = useState(true);
+  const [judgeModeStep, setJudgeModeStep] = useState(0);
 
-  // ── Position & account ─────────────────────────────────────────
-  const [position, setPosition] = useState<Position | null>(null);
-  const [balance, setBalance] = useState<UserAccountBalance>({
-    totalEquityUsd: 5000,
-    availableUsd: 5000,
-    committedMarginUsd: 0,
-    unrealizedPnLUsd: 0,
-    inrExchangeRate: INR_RATE,
-    depositProcessedKeys: [],
-  });
+  const activeScenario = scenarios.find((s) => s.id === activeScenarioId)!;
+  const compareScenario = compareScenarioId ? scenarios.find((s) => s.id === compareScenarioId) : null;
 
-  // ── Order state ────────────────────────────────────────────────
-  const [activeOrder, setActiveOrder] = useState<OrderStateRecord | null>(null);
-  const [isReconciling, setIsReconciling] = useState(false);
-  const [duplicateAttempts, setDuplicateAttempts] = useState(0);
-  const [showReceipt, setShowReceipt] = useState(false);
-  const [completedOrder, setCompletedOrder] = useState<OrderStateRecord | null>(null);
+  const result = useMemo(() => runModel(activeScenario.inputs), [activeScenario.inputs]);
+  const compareResult = useMemo(
+    () => (compareScenario ? runModel(compareScenario.inputs) : null),
+    [compareScenario]
+  );
 
-  // ── UI state ───────────────────────────────────────────────────
-  const [showExplainer, setShowExplainer] = useState(false);
-  const [isSimMode, setIsSimMode] = useState(true);
-  const [marginMetrics, setMarginMetrics] = useState<MarginMetrics | null>(null);
-  const [feedAge, setFeedAge] = useState(0);
+  const lastSnap = result.snapshots[result.snapshots.length - 1];
+  const compareLastSnap = compareResult?.snapshots[compareResult.snapshots.length - 1];
 
-  // ── Demo controller ────────────────────────────────────────────
-  const [demoStep, setDemoStep] = useState<DemoStep>('IDLE');
-  const [reconTimeMs, setReconTimeMs] = useState<number | null>(null);
-  const [dupPaymentsBlocked, setDupPaymentsBlocked] = useState(0);
-  const [staleDetections, setStaleDetections] = useState(0);
-  const [ledgerWriteMs, setLedgerWriteMs] = useState<number | null>(null);
-  const [lastTickMs, setLastTickMs] = useState<number | null>(null);
-  const paymentIdempKeyRef = useRef<string>('');
-  const positionRef = useRef<Position | null>(null);
-  const markPriceRef = useRef(markPrice);
-  const feedTimestampRef = useRef(feedTimestamp);
-  const prevMarkPriceRef = useRef<number | undefined>(undefined);
+  const optimizerData = useMemo(() => {
+    if (!showOptimizer) return [];
+    return sweepPricing(activeScenario.inputs);
+  }, [showOptimizer, activeScenario.inputs]);
 
-  // Keep refs in sync
-  useEffect(() => { positionRef.current = position; }, [position]);
-  useEffect(() => { markPriceRef.current = markPrice; }, [markPrice]);
-  useEffect(() => { feedTimestampRef.current = feedTimestamp; }, [feedTimestamp]);
-  useEffect(() => { prevMarkPriceRef.current = prevMarkPrice; }, [prevMarkPrice]);
+  const optPoint = optimizerData.length
+    ? optimizerData.reduce((best, p) => (p.contribution > best.contribution ? p : best))
+    : null;
 
-  // Sync mark price when symbol changes
-  useEffect(() => {
-    const basePrice = INITIAL_MARK_PRICES[symbol];
-    setMarkPrice(basePrice);
-    setFeedTimestamp(Date.now());
-  }, [symbol]);
+  const tornadoData = useMemo(() => {
+    if (!showSensitivity) return [];
+    return sensitivityTornado(activeScenario.inputs);
+  }, [showSensitivity, activeScenario.inputs]);
 
-  // ── High-frequency margin tick loop (< 10ms target) ─────────────
-  useEffect(() => {
-    const tick = setInterval(() => {
-      const t0 = performance.now();
-      const pos = positionRef.current;
-      const mp = markPriceRef.current;
-      const ft = feedTimestampRef.current;
-      const prev = prevMarkPriceRef.current;
-      const age = Date.now() - ft;
+  const trustLevers = activeScenario.inputs.trustLevers;
 
-      setFeedAge(age);
-
-      // Stale detection: mask health within 500ms of missed heartbeat
-      if (age > BENCH.STALE_THRESHOLD_MS) {
-        setStaleDetections((n) => n + 1);
-      }
-
-      if (pos) {
-        const m = calcMarginMetrics(pos, mp, ft, prev, INR_RATE);
-        setMarginMetrics(m);
-      }
-
-      const elapsed = performance.now() - t0;
-      setLastTickMs(Math.round(elapsed * 100) / 100);
-    }, BENCH.TICK_INTERVAL_MS);
-    return () => clearInterval(tick);
-  }, []);
-
-  // ── Reset margin metrics when position clears ─────────────────
-  useEffect(() => {
-    if (!position) setMarginMetrics(null);
-  }, [position]);
-
-  // ── Helper: refresh feed timestamp ────────────────────────────
-  const refreshFeed = useCallback((price?: number) => {
-    setFeedTimestamp(Date.now());
-    if (price !== undefined) {
-      setPrevMarkPrice(markPrice);
-      setMarkPrice(price);
-    }
-  }, [markPrice]);
-
-  // ── Demo step handler ─────────────────────────────────────────
-  function handleDemoStep(step: DemoStep) {
-    setDemoStep(step);
-
-    if (step === 'OPEN_POSITION') {
-      resetVenue();
-      resetPaymentService();
-      setActiveOrder(null);
-      setDuplicateAttempts(0);
-      setReconTimeMs(null);
-      setDupPaymentsBlocked(0);
-      paymentIdempKeyRef.current = 'DEPOSIT-' + makeId();
-
-      const mp = INITIAL_MARK_PRICES[symbol];
-      const initialMargin = (quantity * mp) / leverage;
-      const newPos: Position = {
-        id: 'POS-' + makeId(),
-        symbol,
-        side: 'LONG',
-        quantity,
-        originalQuantity: quantity,
-        entryPrice: mp,
-        markPrice: mp,
-        leverage,
-        allocatedMargin: initialMargin,
-        currency: 'USD',
-        openedAt: Date.now(),
-        isSimulated: true,
-      };
-      setPosition(newPos);
-      setBalance((b) => ({
-        ...b,
-        availableUsd: b.availableUsd - initialMargin,
-        committedMarginUsd: initialMargin,
-      }));
-      refreshFeed(mp);
-    }
-
-    if (step === 'ADVERSE_SHOCK') {
-      if (!position) return;
-      const shockedPrice = markPrice * 0.925; // −7.5%
-      refreshFeed(shockedPrice);
-      if (position) {
-        setPosition((p) => p ? { ...p, markPrice: shockedPrice } : null);
-      }
-    }
-
-    if (step === 'SUBMIT_CLOSE_ACK_DROP') {
-      if (!position) return;
-      const t0 = performance.now();
-      const order = submitOrder(position.symbol, 'SELL', position.quantity, markPrice, { simulateAckDrop: true, simulatePartialFill: true });
-      const writeMs = Math.round((performance.now() - t0) * 100) / 100;
-      setLedgerWriteMs(writeMs);
-      setActiveOrder(order);
-      setDuplicateAttempts(0);
-    }
-
-    if (step === 'SHOW_UNRESOLVED') {
-      if (activeOrder?.status === 'ACK_LOST_PENDING_RECON') {
-        setDuplicateAttempts((n) => n + 1);
-      }
-    }
-
-    if (step === 'RECONCILE_PARTIAL') {
-      if (!activeOrder) return;
-      const start = performance.now();
-      setIsReconciling(true);
-      setTimeout(() => {
-        const reconciled = reconcileOrder(activeOrder.requestId);
-        const elapsed = Math.round(performance.now() - start);
-        setActiveOrder(reconciled ? { ...reconciled } : activeOrder);
-        setIsReconciling(false);
-        setReconTimeMs(elapsed);
-        if (reconciled && reconciled.remainingQty > 0 && position) {
-          setPosition((p) => p ? { ...p, quantity: reconciled.remainingQty } : null);
+  function updateLever(id: string, patch: Partial<TrustLever>) {
+    setScenarios((prev) =>
+      prev.map((s) =>
+        s.id !== activeScenarioId ? s : {
+          ...s,
+          inputs: {
+            ...s.inputs,
+            trustLevers: s.inputs.trustLevers.map((l) =>
+              l.id === id ? { ...l, ...patch } : l
+            ),
+          },
         }
-        if (reconciled?.status === 'FILLED' && position) {
-          setPosition(null);
-          setCompletedOrder(reconciled);
-          setShowReceipt(true);
-          setBalance((b) => ({
-            ...b,
-            committedMarginUsd: 0,
-            availableUsd: b.availableUsd + position.allocatedMargin + (reconciled.filledQty * reconciled.avgFillPrice - reconciled.filledQty * position.entryPrice),
-          }));
+      )
+    );
+  }
+
+  function updateInput(path: string, value: number) {
+    setScenarios((prev) =>
+      prev.map((s) => {
+        if (s.id !== activeScenarioId) return s;
+        const newInputs = JSON.parse(JSON.stringify(s.inputs)) as ModelInputs;
+        if (path.includes('.')) {
+          const [section, key] = path.split('.');
+          const sec = (newInputs as unknown as Record<string, Record<string, number>>)[section];
+          if (sec) sec[key] = value;
+        } else {
+          (newInputs as unknown as Record<string, number>)[path] = value;
         }
-      }, BENCH.RECON_SIMULATED_MS);
-    }
-
-    if (step === 'DUPLICATE_PAYMENT') {
-      const key = paymentIdempKeyRef.current || 'DEPOSIT-DEMO01';
-      const payload = {
-        paymentId: 'PAY-' + makeId(),
-        idempotencyKey: key,
-        amountInr: 50000,
-        amountUsd: 50000 / INR_RATE,
-        senderName: 'Demo Trader',
-        bankRef: 'NEFT-' + makeId(),
-        timestamp: Date.now(),
-      };
-
-      const result1 = processPaymentWebhook(payload, balance);
-      if (result1.credited) setBalance(result1.balance);
-
-      const result2 = processPaymentWebhook({ ...payload, paymentId: 'PAY-' + makeId() }, result1.balance);
-      if (result2.deduped) setDupPaymentsBlocked((n) => n + 1);
-    }
+        return { ...s, inputs: newInputs };
+      })
+    );
   }
 
-  function handleClosePosition() {
-    if (!position || !activeOrder || activeOrder.status === 'ACK_LOST_PENDING_RECON') return;
-    const order = submitOrder(position.symbol, 'SELL', position.quantity, markPrice);
-    setActiveOrder(order);
-    if (order.status === 'FILLED') {
-      const pnl = (order.avgFillPrice - position.entryPrice) * position.quantity;
-      setBalance((b) => ({
-        ...b,
-        availableUsd: b.availableUsd + position.allocatedMargin + pnl,
-        committedMarginUsd: 0,
-      }));
-      setPosition(null);
-      setCompletedOrder(order);
-      setShowReceipt(true);
-    }
+  function cloneScenario() {
+    const id = 'custom-' + Date.now();
+    setScenarios((prev) => [
+      ...prev,
+      { ...activeScenario, id, name: activeScenario.name + ' (Copy)', isPreset: false, color: '#60a5fa' },
+    ]);
+    setActiveScenarioId(id);
   }
 
-  function handleReducePosition() {
-    if (!position || position.quantity <= 1) return;
-    const reduceQty = Math.ceil(position.quantity * 0.25);
-    const order = submitOrder(position.symbol, 'SELL', reduceQty, markPrice);
-    setActiveOrder(order);
-    if (order.status === 'FILLED' || order.status === 'PARTIALLY_FILLED') {
-      const freed = (position.allocatedMargin / position.quantity) * order.filledQty;
-      setPosition((p) => p ? { ...p, quantity: p.quantity - order.filledQty, allocatedMargin: p.allocatedMargin - freed } : null);
-      setBalance((b) => ({ ...b, availableUsd: b.availableUsd + freed, committedMarginUsd: b.committedMarginUsd - freed }));
-    }
-  }
+  const judgeModeSteps = [
+    { title: '① Thesis', desc: 'Our Round 1 recommendation: Crew Pass + trust → lower CAC, higher retention, fee-insensitive users.' },
+    { title: '② Compare', desc: 'Switch active tab to "Baseline". The Recommended scenario cuts blended CAC by ~70% via Crew Pass channel.' },
+    { title: '③ Trust → Numbers', desc: 'Toggle a trust lever off. Watch retention drop in the funnel. Click "See it work" to view the live implementation.' },
+    { title: '④ Price it', desc: 'Open the Pricing Optimiser. See how higher trust shifts the optimal fee rightward.' },
+    { title: '⑤ Break it', desc: 'Switch to "Honest Stress" scenario tab. Trust levers fail → see when Baseline wins.' },
+  ];
 
-  function handleReconcile() {
-    if (!activeOrder) return;
-    handleDemoStep('RECONCILE_PARTIAL');
-  }
+  const inp = activeScenario.inputs;
 
-  const contract = CONTRACT_CATALOG[symbol];
-  const isPosShocked = prevMarkPrice && markPrice < prevMarkPrice;
+  const decision = useMemo(() => {
+    if (!lastSnap) return null;
+    const feeBps = inp.pricing.takerFeeBps;
+    const crewEvents = inp.channel.crewEventsPerMonth;
+    const ltvCac = lastSnap.ltvCacRatio;
+    const breakeven = result.breakevenMonth;
+    const parts: string[] = [];
+    if (feeBps <= 6) parts.push(`Set taker fee at ${feeBps} bps — competitive vs Dhan/Zerodha futures spread.`);
+    else parts.push(`Consider reducing taker fee below 8 bps — current ${feeBps} bps suppresses volume via price elasticity.`);
+    if (crewEvents >= 3) parts.push(`Run ${crewEvents} Market Night events/month — crew CAC ${fmtUsd(lastSnap.crewCacUsd)} vs paid ${fmtUsd(lastSnap.paidCacUsd)}.`);
+    else parts.push(`Increase Crew Pass cadence — paid channel is carrying all acquisition cost.`);
+    if (ltvCac > 3) parts.push(`LTV:CAC ${fmt(ltvCac, 1)}× is healthy. Growth is economically sustainable.`);
+    else parts.push(`⚠ LTV:CAC ${fmt(ltvCac, 1)}× below 3× threshold — cut paid spend or improve retention first.`);
+    if (breakeven && breakeven <= 9) parts.push(`Contribution breakeven at month ${breakeven} — viable within pre-seed runway.`);
+    else parts.push(`Breakeven not reached in 12 months — reduce event spend or increase conversion rates.`);
+    return parts;
+  }, [inp, lastSnap, result.breakevenMonth]);
 
   return (
-    <div className="terminal-root">
-      {/* ── Top Header ───────────────────────────────────────── */}
-      <Header balance={balance} feedAge={feedAge} isSimulated={isSimMode} />
+    <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
 
-      {/* ── Left Sidebar (Markets & Account) ──────────────────── */}
-      <ContractSidebar
-        selectedSymbol={symbol}
-        onSelect={setSymbol}
-        position={position}
-        balance={balance}
-        onOpenExplainer={() => setShowExplainer(true)}
-      />
-
-      {/* ── Center Main Panel ─────────────────────────────────── */}
-      <main className="terminal-main p-4 space-y-4 bg-[var(--bg-base)] relative overflow-hidden">
-        <AuroraBackground />
-
-        {/* Market Night Crew Pass Promotion Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          className="card p-3 bg-gradient-to-r from-[var(--bg-surface)] via-[var(--bg-interactive)] to-[var(--bg-surface)] border border-[var(--brand-border)] flex flex-wrap items-center justify-between gap-3 text-[12px]"
+      {/* ── Top Bar ──────────────────────────────────────────────────────────── */}
+      <header className="h-12 border-b border-[var(--border)] flex items-center px-4 gap-4 bg-[var(--bg-surface)] sticky top-0 z-50">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 rounded bg-[var(--brand)] flex items-center justify-center">
+            <BarChart3 className="w-3.5 h-3.5 text-black" />
+          </div>
+          <span className="font-bold text-[13px]">MochaTrade</span>
+          <span className="text-[var(--text-muted)] text-[11px]">/ Decision Cockpit</span>
+        </div>
+        <div className="flex-1" />
+        <nav className="hidden md:flex items-center gap-1 text-[11px]">
+          <Link href="/proof/terminal" className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1">
+            <Shield className="w-3 h-3" /> Trust Evidence
+          </Link>
+          <Link href="/proof/market-night" className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1">
+            <Users className="w-3 h-3" /> Market Night
+          </Link>
+          <Link href="/proof/contracts" className="px-2 py-1 rounded hover:bg-[var(--bg-hover)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1">
+            <Zap className="w-3 h-3" /> Contract Rules
+          </Link>
+        </nav>
+        <button
+          onClick={() => setShowJudgeMode(!showJudgeMode)}
+          className="btn btn-sm border border-[var(--brand-border)] text-[var(--brand)] hover:bg-[var(--brand-dim)] text-[11px] px-2 py-1"
         >
-          <div className="flex items-center gap-2.5">
-            <GlowPulse color="brand" size={8} />
-            <span className="font-bold text-[var(--brand)]">Tonight’s Market Night:</span>
-            <ShimmerText className="font-semibold text-[var(--text-primary)]">
-              “Bring your four. Unlock tonight’s Crew Pass.”
-            </ShimmerText>
-            <span className="text-[var(--text-secondary)] hidden md:inline">— Exclusive scenario, team report & guest AMA.</span>
-          </div>
-          <a href="/market-night">
-            <AnimatedButton variant="primary" size="sm" className="py-1 px-3 text-[11px] font-bold shrink-0">
-              Join with Your Crew
-            </AnimatedButton>
-          </a>
-        </motion.div>
+          {showJudgeMode ? 'Exit' : '▶'} Judge Mode
+        </button>
+      </header>
 
-        {/* Contract Ticker Strip */}
-        <div className="card p-3.5 flex flex-wrap items-center justify-between gap-4 bg-[var(--bg-surface)]">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-[var(--brand-dim)] flex items-center justify-center font-bold text-[13px] text-[var(--brand)]">
-              {contract.underlyingTicker.slice(0, 2)}
+      {/* ── Judge Mode Guide Bar ───────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showJudgeMode && (
+          <motion.div
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            className="border-b border-[var(--brand-border)] bg-[var(--brand-dim)] px-4 py-2 flex items-center gap-4"
+          >
+            <span className="text-[11px] font-bold text-[var(--brand)] shrink-0">JUDGE MODE</span>
+            <div className="flex items-center gap-2 overflow-x-auto">
+              {judgeModeSteps.map((step, i) => (
+                <button key={i} onClick={() => setJudgeModeStep(i)}
+                  className={`text-[10px] px-2.5 py-1 rounded-full border whitespace-nowrap transition-colors ${i === judgeModeStep
+                    ? 'bg-[var(--brand)] text-black border-[var(--brand)] font-bold'
+                    : 'border-[var(--brand-border)] text-[var(--text-secondary)] hover:text-[var(--brand)]'
+                    }`}>
+                  {step.title}
+                </button>
+              ))}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-[16px] font-bold text-[var(--text-primary)] tracking-tight">
-                  {contract.underlyingTicker} Perpetual
-                </h1>
-                <span className="badge badge-brand">USD Cash-Settled</span>
+            <p className="text-[10px] text-[var(--text-secondary)] shrink-0 max-w-xs hidden md:block">
+              {judgeModeSteps[judgeModeStep].desc}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Thesis Banner ──────────────────────────────────────────────────── */}
+      <div className="border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 py-2 flex items-start gap-3">
+        <span className="text-[var(--brand)] text-[9px] font-bold uppercase tracking-widest mt-0.5 shrink-0">Round 1 Thesis</span>
+        <p className="text-[11px] text-[var(--text-secondary)]">
+          Shift MochaTrade from paid-acquisition-led to a{' '}
+          <strong className="text-[var(--text-primary)]">trust-first, community-viral growth engine</strong>
+          {' '}— lower CAC via Crew Pass, higher retention via explainable trust features, fee-insensitive users via demonstrated platform reliability.
+        </p>
+      </div>
+
+      {/* ── Scenario Tabs ─────────────────────────────────────────────────── */}
+      <div className="border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 flex items-center gap-0 overflow-x-auto">
+        {scenarios.map((s) => (
+          <button key={s.id} onClick={() => setActiveScenarioId(s.id)}
+            className={`px-3 py-2.5 text-[11px] font-semibold border-b-2 transition-colors whitespace-nowrap`}
+            style={{
+              borderBottomColor: s.id === activeScenarioId ? s.color : 'transparent',
+              color: s.id === activeScenarioId ? s.color : 'var(--text-secondary)',
+            }}>
+            {s.name}
+          </button>
+        ))}
+        <button onClick={cloneScenario}
+          className="px-3 py-2.5 text-[11px] text-[var(--text-muted)] hover:text-[var(--brand)] flex items-center gap-1">
+          <Plus className="w-3 h-3" /> New
+        </button>
+        <div className="flex-1" />
+        <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pr-2">
+          <span className="hidden sm:inline">Compare vs:</span>
+          <select value={compareScenarioId || ''} onChange={(e) => setCompareScenarioId(e.target.value || null)}
+            className="bg-[var(--bg-interactive)] border border-[var(--border)] rounded px-2 py-1 text-[10px] text-[var(--text-secondary)]">
+            <option value="">None</option>
+            {scenarios.filter((s) => s.id !== activeScenarioId).map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      {/* ── Warnings ───────────────────────────────────────────────────────── */}
+      {result.warnings.map((w, i) => (
+        <div key={i} className="bg-[var(--red-dim)] border-b border-[var(--red-border)] px-4 py-2 flex items-center gap-2 text-[11px] text-[var(--red)]">
+          <AlertTriangle className="w-3.5 h-3.5 shrink-0" />{w}
+        </div>
+      ))}
+
+      {/* ── Scenario description strip ─────────────────────────────────────── */}
+      <div className="border-b border-[var(--border)] px-4 py-2 bg-[var(--bg-base)] flex items-center gap-3">
+        <div className="w-2 h-2 rounded-full shrink-0" style={{ background: activeScenario.color }} />
+        <p className="text-[11px] text-[var(--text-muted)]">{activeScenario.description}</p>
+      </div>
+
+      {/* ── Main 3-column layout ──────────────────────────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-[280px_1fr_300px] min-h-[calc(100vh-200px)]">
+
+        {/* ── LEFT: Inputs ─────────────────────────────────────────────────── */}
+        <div className="border-r border-[var(--border)] p-4 space-y-5 overflow-y-auto">
+          <div className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Inputs</div>
+
+          {/* Pricing */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)] flex items-center gap-1">
+              Pricing
+            </h3>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Taker fee</span>
+                <span className="font-mono text-[var(--brand)]">{inp.pricing.takerFeeBps} bps</span>
               </div>
-              <p className="text-[11px] text-[var(--text-secondary)]">
-                {contract.underlyingName} · Max {contract.maxLeverage}× Leverage · 8h Funding
-              </p>
+              <input type="range" min={1} max={20} step={0.5} value={inp.pricing.takerFeeBps}
+                onChange={(e) => updateInput('pricing.takerFeeBps', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <div className="flex justify-between text-[9px] text-[var(--text-muted)]">
+                <span>1 bps</span><ProvenanceChip type="ASSUMED" /><span>20 bps</span>
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>FX spread</span>
+                <span className="font-mono text-[var(--brand)]">{inp.pricing.fxSpreadPct}%</span>
+              </div>
+              <input type="range" min={0.1} max={0.5} step={0.05} value={inp.pricing.fxSpreadPct}
+                onChange={(e) => updateInput('pricing.fxSpreadPct', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="SIMULATED" />
             </div>
           </div>
 
-          {/* Quick price stats */}
-          <div className="flex items-center gap-6">
-            <div>
-              <span className="stat-label">Mark Price</span>
-              <p className="text-[18px] font-mono font-bold text-[var(--text-primary)] price-display">
-                ${markPrice.toFixed(2)}
-              </p>
+          {/* Channels */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">Channels</h3>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Paid budget</span>
+                <span className="font-mono text-[var(--brand)]">{fmtUsd(inp.channel.paidBudgetUsd)}/mo</span>
+              </div>
+              <input type="range" min={0} max={20000} step={500} value={inp.channel.paidBudgetUsd}
+                onChange={(e) => updateInput('channel.paidBudgetUsd', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
             </div>
-            <div>
-              <span className="stat-label">Est. 24h</span>
-              <p className="text-[13px] font-mono font-semibold text-[var(--green)] flex items-center gap-0.5">
-                <ArrowUpRight className="w-3.5 h-3.5" /> +2.4%
-              </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Market Night events/mo</span>
+                <span className="font-mono text-[var(--brand)]">{inp.channel.crewEventsPerMonth}</span>
+              </div>
+              <input type="range" min={0} max={16} step={1} value={inp.channel.crewEventsPerMonth}
+                onChange={(e) => updateInput('channel.crewEventsPerMonth', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
             </div>
-            <div>
-              <span className="stat-label">Funding (8h)</span>
-              <p className="text-[13px] font-mono font-semibold text-[var(--brand)]">
-                0.0100%
-              </p>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Crews per event</span>
+                <span className="font-mono text-[var(--brand)]">{inp.channel.crewsPerEvent}</span>
+              </div>
+              <input type="range" min={0} max={20} step={1} value={inp.channel.crewsPerEvent}
+                onChange={(e) => updateInput('channel.crewsPerEvent', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
             </div>
-            <button
-              onClick={() => setShowExplainer(true)}
-              className="btn btn-ghost btn-sm"
-            >
-              <Info className="w-3.5 h-3.5 text-[var(--brand)]" />
-              <span>Contract Rules</span>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Crew join rate</span>
+                <span className="font-mono text-[var(--brand)]">{fmtPct(inp.channel.crewJoinRate)}</span>
+              </div>
+              <input type="range" min={0.1} max={0.95} step={0.01} value={inp.channel.crewJoinRate}
+                onChange={(e) => updateInput('channel.crewJoinRate', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="SIMULATED" />
+            </div>
+          </div>
+
+          {/* Volume & Funnel */}
+          <div className="space-y-3">
+            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">Volume & Funnel</h3>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Volume / active user</span>
+                <span className="font-mono text-[var(--brand)]">{fmtUsd(inp.baseVolumePerActiveUsd)}/mo</span>
+              </div>
+              <input type="range" min={200} max={10000} step={100} value={inp.baseVolumePerActiveUsd}
+                onChange={(e) => updateInput('baseVolumePerActiveUsd', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Monthly retention</span>
+                <span className="font-mono text-[var(--brand)]">{fmtPct(inp.funnelRetention)}</span>
+              </div>
+              <input type="range" min={0.1} max={0.9} step={0.01} value={inp.funnelRetention}
+                onChange={(e) => updateInput('funnelRetention', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Price elasticity ε</span>
+                <span className="font-mono text-[var(--brand)]">{inp.priceElasticity.toFixed(1)}</span>
+              </div>
+              <input type="range" min={0.2} max={2.0} step={0.1} value={inp.priceElasticity}
+                onChange={(e) => updateInput('priceElasticity', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <ProvenanceChip type="ASSUMED" />
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between text-[11px]">
+                <span>Trust dampening θ</span>
+                <span className="font-mono text-[var(--brand)]">{inp.trustElasticityDampening.toFixed(2)}</span>
+              </div>
+              <input type="range" min={0} max={0.5} step={0.01} value={inp.trustElasticityDampening}
+                onChange={(e) => updateInput('trustElasticityDampening', +e.target.value)}
+                className="w-full accent-amber-500" />
+              <div className="text-[9px] text-[var(--text-muted)]">How much trust reduces fee sensitivity</div>
+              <ProvenanceChip type="ASSUMED" />
+            </div>
+          </div>
+
+          <button onClick={() => setScenarios([...PRESET_SCENARIOS])}
+            className="w-full text-[10px] text-[var(--text-muted)] hover:text-[var(--brand)] flex items-center justify-center gap-1 py-1">
+            <RotateCcw className="w-3 h-3" /> Reset all to presets
+          </button>
+        </div>
+
+        {/* ── CENTER: Projection ───────────────────────────────────────────── */}
+        <div className="p-4 space-y-4 overflow-y-auto">
+
+          {/* KPI Strip */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <KpiCard label="Blended CAC"
+              value={fmtUsd(lastSnap?.blendedCacUsd || 0)}
+              sub={compareLastSnap ? `vs ${fmtUsd(compareLastSnap.blendedCacUsd)} (${compareScenario?.name})` : undefined}
+              positive={compareLastSnap ? (lastSnap.blendedCacUsd < compareLastSnap.blendedCacUsd) : null}
+              provenance="DERIVED" />
+            <KpiCard label="LTV:CAC"
+              value={fmt(lastSnap?.ltvCacRatio || 0, 1) + '×'}
+              sub={compareLastSnap ? `baseline: ${fmt(compareLastSnap.ltvCacRatio, 1)}×` : undefined}
+              positive={compareLastSnap ? (lastSnap.ltvCacRatio > compareLastSnap.ltvCacRatio) : null}
+              provenance="DERIVED" />
+            <KpiCard label="12-mo Revenue"
+              value={fmtUsd(result.totalRevenue12m)}
+              sub={compareResult ? `vs ${fmtUsd(compareResult.totalRevenue12m)}` : undefined}
+              positive={compareResult ? (result.totalRevenue12m > compareResult.totalRevenue12m) : null}
+              provenance="DERIVED" />
+            <KpiCard label="Breakeven"
+              value={result.breakevenMonth ? `Month ${result.breakevenMonth}` : '> 12 mo'}
+              positive={result.breakevenMonth !== null && result.breakevenMonth <= 9}
+              provenance="DERIVED" />
+          </div>
+
+          {/* Revenue chart */}
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-[11px] font-semibold">12-Month Revenue Projection <ProvenanceChip type="DERIVED" /></span>
+              <div className="flex items-center gap-3 text-[10px]">
+                <span className="flex items-center gap-1">
+                  <div className="w-3 h-1.5 rounded" style={{ background: activeScenario.color }} />
+                  {activeScenario.name}
+                </span>
+                {compareScenario && (
+                  <span className="flex items-center gap-1">
+                    <div className="w-3 h-1.5 rounded opacity-50" style={{ background: compareScenario.color }} />
+                    {compareScenario.name}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-end gap-0.5 h-28">
+              {result.snapshots.map((snap, i) => {
+                const maxRev = Math.max(...result.snapshots.map((s) => s.totalRevenue),
+                  ...(compareResult?.snapshots.map((s) => s.totalRevenue) || []), 1);
+                const h = Math.max(2, (snap.totalRevenue / maxRev) * 100);
+                const compSnap = compareResult?.snapshots[i];
+                const ch = compSnap ? Math.max(2, (compSnap.totalRevenue / maxRev) * 100) : 0;
+                return (
+                  <div key={i} className="flex-1 flex items-end gap-0.5">
+                    {compareScenario && compSnap && (
+                      <div className="flex-1 rounded-t opacity-40" style={{ height: `${ch}%`, background: compareScenario.color }} />
+                    )}
+                    <div className="flex-1 rounded-t" style={{ height: `${h}%`, background: activeScenario.color }} />
+                  </div>
+                );
+              })}
+            </div>
+            <div className="flex justify-between text-[9px] text-[var(--text-muted)] mt-1">
+              <span>Mo 1</span><span>Mo 6</span><span>Mo 12</span>
+            </div>
+          </div>
+
+          {/* Funnel bars */}
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-[11px] font-semibold mb-3">
+              Month 12 Funnel <ProvenanceChip type="DERIVED" />
+            </div>
+            {([
+              ['Signups', lastSnap?.totalSignups || 0, compareLastSnap?.totalSignups],
+              ['KYC Passed', lastSnap?.kycPassed || 0, compareLastSnap?.kycPassed],
+              ['Deposited', lastSnap?.deposited || 0, compareLastSnap?.deposited],
+              ['First Trade', lastSnap?.firstTraded || 0, compareLastSnap?.firstTraded],
+              ['Active (M12)', lastSnap?.activeUsers || 0, compareLastSnap?.activeUsers],
+            ] as [string, number, number | undefined][]).map(([label, val, cVal]) => {
+              const max = lastSnap?.totalSignups || 1;
+              const colors: Record<string, string> = {
+                'Signups': '#60a5fa', 'KYC Passed': '#f59e0b', 'Deposited': '#f59e0b',
+                'First Trade': '#22c55e', 'Active (M12)': '#22c55e',
+              };
+              return (
+                <div key={label} className="flex items-center gap-2 mb-2">
+                  <div className="w-20 text-[10px] text-[var(--text-secondary)] text-right">{label}</div>
+                  <div className="flex-1 h-4 bg-[var(--bg-interactive)] rounded-sm overflow-hidden relative">
+                    {cVal !== undefined && (
+                      <div className="absolute inset-y-0 left-0 rounded-sm opacity-30"
+                        style={{ width: `${(cVal / max) * 100}%`, background: compareScenario?.color || '#7e7e9a' }} />
+                    )}
+                    <div className="absolute inset-y-0 left-0 rounded-sm"
+                      style={{ width: `${(val / max) * 100}%`, background: colors[label] || '#60a5fa', opacity: 0.8 }} />
+                  </div>
+                  <div className="w-12 text-[10px] font-mono text-right">{fmt(val)}</div>
+                  {cVal !== undefined && (
+                    <div className={`w-12 text-[10px] font-mono text-right ${val >= cVal ? 'text-[var(--green)]' : 'text-[var(--red)]'}`}>
+                      {val >= cVal ? '+' : ''}{fmt(val - cVal)}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Channel mix */}
+          <div className="card p-4 bg-[var(--bg-surface)]">
+            <div className="text-[11px] font-semibold mb-3">Acquisition Mix — Month 12 <ProvenanceChip type="DERIVED" /></div>
+            <div className="grid grid-cols-4 gap-3">
+              {[
+                { label: 'Paid', val: lastSnap?.paidSignups || 0, color: '#7e7e9a' },
+                { label: 'Crew Pass', val: lastSnap?.crewSignups || 0, color: '#f59e0b' },
+                { label: 'Organic', val: lastSnap?.organicSignups || 0, color: '#22c55e' },
+                { label: 'Referral', val: lastSnap?.referralSignups || 0, color: '#60a5fa' },
+              ].map(({ label, val, color }) => (
+                <div key={label} className="text-center">
+                  <p className="text-[20px] font-mono font-bold" style={{ color }}>{fmt(val)}</p>
+                  <p className="text-[9px] text-[var(--text-muted)]">{label}</p>
+                  <p className="text-[9px] text-[var(--text-muted)]">
+                    {lastSnap?.totalSignups ? fmtPct(val / lastSnap.totalSignups) : '0%'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Pricing Optimizer */}
+          <div className="card bg-[var(--bg-surface)]">
+            <button onClick={() => setShowOptimizer(!showOptimizer)}
+              className="w-full flex items-center justify-between p-4 text-[11px] font-semibold hover:bg-[var(--bg-hover)]">
+              <span className="flex items-center gap-2">
+                <Target className="w-4 h-4 text-[var(--brand)]" /> Pricing Optimiser
+              </span>
+              {showOptimizer ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
-          </div>
-        </div>
-
-        {/* Mini Price & Depth Bar (Kalshi aesthetic) */}
-        <div className="card p-3 bg-[var(--bg-surface)] flex items-center justify-between gap-4 text-[12px]">
-          <div className="flex items-center gap-3">
-            <span className="text-[10px] uppercase tracking-wider font-semibold text-[var(--text-muted)]">Order Book</span>
-            <div className="flex items-center gap-2 font-mono">
-              <span className="text-[var(--green)] font-semibold">${(markPrice - 0.05).toFixed(2)}</span>
-              <span className="text-[10px] text-[var(--text-muted)]">Bid</span>
-              <span className="text-[var(--text-muted)]">/</span>
-              <span className="text-[var(--red)] font-semibold">${(markPrice + 0.05).toFixed(2)}</span>
-              <span className="text-[10px] text-[var(--text-muted)]">Ask</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 text-[11px] text-[var(--text-secondary)] font-mono">
-            <span>24h Vol: <strong className="text-[var(--text-primary)]">$14.2M</strong></span>
-            <span>Open Interest: <strong className="text-[var(--text-primary)]">8,450 Lots</strong></span>
-          </div>
-        </div>
-
-        {/* Active Position / Zero State */}
-        {!position ? (
-          <div className="card p-8 text-center bg-[var(--bg-surface)] border-dashed border-[var(--border)] space-y-3">
-            <div className="w-10 h-10 rounded-full bg-[var(--brand-dim)] text-[var(--brand)] flex items-center justify-center mx-auto">
-              <Layers className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-semibold text-[14px] text-[var(--text-primary)]">No Active Position on {symbol}</h3>
-              <p className="text-[12px] text-[var(--text-secondary)] mt-1 max-w-md mx-auto">
-                Explore perpetual exposure with visible margin safety and automated transaction reconciliation.
-              </p>
-            </div>
-            <div className="flex justify-center gap-2 pt-2">
-              <AnimatedButton
-                variant="ghost"
-                size="sm"
-                onClick={() => setShowExplainer(true)}
-              >
-                Learn Contract Rules
-              </AnimatedButton>
-              <AnimatedButton
-                variant="primary"
-                size="sm"
-                onClick={() => handleDemoStep('OPEN_POSITION')}
-              >
-                <Zap className="w-3.5 h-3.5 mr-1" />
-                Open 5× Simulated Position
-              </AnimatedButton>
-            </div>
-          </div>
-        ) : (
-          <div className="space-y-4 fade-in">
-            {/* Real-time Explainable Margin-Health Indicator */}
-            {marginMetrics && (
-              <MarginHealthIndicator
-                metrics={marginMetrics}
-                position={position}
-                onReduce={handleReducePosition}
-                onClose={() => {
-                  if (activeOrder?.status === 'ACK_LOST_PENDING_RECON') {
-                    setDuplicateAttempts((n) => n + 1);
-                  } else {
-                    handleClosePosition();
-                  }
-                }}
-                onReview={() => setShowExplainer(true)}
-              />
+            {showOptimizer && (
+              <div className="px-4 pb-4 space-y-3 border-t border-[var(--border)]">
+                <p className="text-[10px] text-[var(--text-muted)] pt-2">
+                  Sweeps taker fee 1–20 bps; holds all else constant. Green = optimal. Amber = current.
+                  Key thesis: higher T → optimal fee shifts right.
+                </p>
+                {optPoint && (
+                  <div className="flex gap-6">
+                    <div>
+                      <p className="text-[10px] text-[var(--text-muted)]">Optimal fee</p>
+                      <p className="text-[20px] font-mono font-bold text-[var(--green)]">{optPoint.feeBps} bps</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-[var(--text-muted)]">Max 12-mo contribution</p>
+                      <p className="text-[20px] font-mono font-bold text-[var(--green)]">{fmtUsd(optPoint.contribution)}</p>
+                    </div>
+                    <div>
+                      <p className="text-[10px] text-[var(--text-muted)]">Current fee</p>
+                      <p className="text-[20px] font-mono font-bold text-[var(--brand)]">{inp.pricing.takerFeeBps} bps</p>
+                    </div>
+                  </div>
+                )}
+                <div className="flex items-end gap-px h-20">
+                  {optimizerData.map((p) => {
+                    const maxC = Math.max(...optimizerData.map((x) => x.contribution));
+                    const minC = Math.min(...optimizerData.map((x) => x.contribution));
+                    const range = maxC - minC || 1;
+                    const h = Math.max(2, ((p.contribution - minC) / range) * 100);
+                    const isOpt = p.feeBps === optPoint?.feeBps;
+                    const isCurr = Math.abs(p.feeBps - inp.pricing.takerFeeBps) < 0.3;
+                    return (
+                      <div key={p.feeBps} className="flex-1 rounded-t"
+                        style={{ height: `${h}%`, background: isOpt ? '#22c55e' : isCurr ? '#f59e0b' : '#252535' }}
+                        title={`${p.feeBps} bps → ${fmtUsd(p.contribution)}`} />
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[9px] text-[var(--text-muted)]">
+                  <span>1 bps</span>
+                  <span className="text-[var(--green)]">▲ optimal</span>
+                  <span className="text-[var(--brand)]">■ current</span>
+                  <span>20 bps</span>
+                </div>
+                <ProvenanceChip type="DERIVED" />
+              </div>
             )}
           </div>
-        )}
 
-        {/* Transaction Recovery Panel (Always accessible when orders occur) */}
-        {(activeOrder || position) && (
-          <div className="fade-in space-y-1">
-            <TransactionRecoveryPanel
-              order={activeOrder}
-              onReconcile={handleReconcile}
-              onConfirmClose={handleClosePosition}
-              isReconciling={isReconciling}
-              duplicateAttempts={duplicateAttempts}
-            />
+          {/* Sensitivity Tornado */}
+          <div className="card bg-[var(--bg-surface)]">
+            <button onClick={() => setShowSensitivity(!showSensitivity)}
+              className="w-full flex items-center justify-between p-4 text-[11px] font-semibold hover:bg-[var(--bg-hover)]">
+              <span className="flex items-center gap-2">
+                <BarChart3 className="w-4 h-4 text-[var(--brand)]" /> Sensitivity Tornado (top 8)
+              </span>
+              {showSensitivity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+            {showSensitivity && (
+              <div className="px-4 pb-4 space-y-2 border-t border-[var(--border)]">
+                <p className="text-[10px] text-[var(--text-muted)] pt-2">
+                  ±swing on 12-mo contribution when each assumption moves ±20–50%. Widest bar = biggest model risk.
+                </p>
+                {tornadoData.map((t) => (
+                  <div key={t.assumptionId} className="space-y-0.5">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--text-secondary)]">{t.label} <span className="text-[var(--text-muted)]">({t.assumptionId})</span></span>
+                      <span className="text-[var(--text-muted)] font-mono">{fmtUsd(t.swing)}</span>
+                    </div>
+                    <div className="h-3 bg-[var(--bg-interactive)] rounded overflow-hidden flex">
+                      <div className="flex-1 flex items-center justify-end pr-px">
+                        <div className="h-full bg-[var(--red)] opacity-70 rounded-l"
+                          style={{ width: `${Math.min(100, (t.swing / (tornadoData[0]?.swing || 1)) * 50)}%` }} />
+                      </div>
+                      <div className="flex-1 flex items-center justify-start pl-px">
+                        <div className="h-full bg-[var(--green)] opacity-70 rounded-r"
+                          style={{ width: `${Math.min(100, (t.swing / (tornadoData[0]?.swing || 1)) * 50)}%` }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <ProvenanceChip type="DERIVED" />
+              </div>
+            )}
           </div>
-        )}
-      </main>
+        </div>
 
-      {/* ── Right Panel (Judge Demo & SLA Benchmarks) ─────────── */}
-      <aside className="terminal-panel">
-        <JudgeDemoController
-          currentStep={demoStep}
-          metrics={{
-            reconciliationMs: reconTimeMs,
-            duplicatesBlocked: dupPaymentsBlocked,
-            staleDataDetections: staleDetections,
-            ledgerWriteMs,
-            lastTickMs,
-          }}
-          onStep={handleDemoStep}
-        />
-      </aside>
+        {/* ── RIGHT: Trust Ladder + Decision ───────────────────────────────── */}
+        <div className="border-l border-[var(--border)] p-4 space-y-4 overflow-y-auto">
 
-      {/* ── Modals ────────────────────────────────────────────── */}
-      {showExplainer && (
-        <PreTradeExplainer
-          selectedSymbol={symbol}
-          onSymbolChange={setSymbol}
-          leverage={leverage}
-          onLeverageChange={setLeverage}
-          quantity={quantity}
-          onQuantityChange={setQuantity}
-          onOpenSimulation={() => {
-            setIsSimMode(true);
-            setShowExplainer(false);
-            handleDemoStep('OPEN_POSITION');
-          }}
-          onClose={() => setShowExplainer(false)}
-        />
-      )}
+          {/* Trust score header */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Trust Ladder</span>
+              <span className="text-[15px] font-mono font-bold text-[var(--brand)]">
+                T = {fmtPct(lastSnap?.trustScore || 0)}
+              </span>
+            </div>
+            <div className="h-2 bg-[var(--bg-interactive)] rounded overflow-hidden">
+              <div className="h-full bg-[var(--brand)] rounded transition-all duration-300"
+                style={{ width: `${(lastSnap?.trustScore || 0) * 100}%` }} />
+            </div>
+            <p className="text-[9px] text-[var(--text-muted)]">
+              Each lever feeds into T → adjusts funnel conversions + support cost.{' '}
+              Toggle off to see the number drop.
+            </p>
+          </div>
 
-      {showReceipt && completedOrder && (
-        <PostTradeReceipt
-          order={completedOrder}
-          balance={balance}
-          onSurveySubmit={(survey: PostTradeSurvey) => {
-            console.log('Survey submitted:', survey);
-            setShowReceipt(false);
-          }}
-          onDismiss={() => setShowReceipt(false)}
-        />
-      )}
+          {/* Trust levers */}
+          <div className="space-y-2">
+            {trustLevers.map((lever) => (
+              <div key={lever.id}
+                className={`card p-3 border transition-all ${lever.enabled
+                  ? 'border-[var(--brand-border)] bg-[var(--brand-dim)]'
+                  : 'border-[var(--border)] bg-[var(--bg-surface)] opacity-60'
+                  }`}>
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[11px] font-semibold truncate">{lever.label}</div>
+                    <div className="text-[9px] text-[var(--text-muted)] mt-0.5 leading-relaxed">{lever.description}</div>
+                  </div>
+                  <button
+                    onClick={() => updateLever(lever.id, { enabled: !lever.enabled })}
+                    className={`shrink-0 w-9 h-5 rounded-full relative transition-colors ${lever.enabled ? 'bg-[var(--brand)]' : 'bg-[var(--bg-interactive)]'}`}
+                    aria-label={`Toggle ${lever.label}`}
+                  >
+                    <div className={`absolute top-1 w-3 h-3 rounded-full bg-white transition-all ${lever.enabled ? 'left-5' : 'left-1'}`} />
+                  </button>
+                </div>
+
+                {lever.enabled && (
+                  <div className="mt-2 space-y-1">
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-[var(--text-muted)]">Completeness</span>
+                      <span className="font-mono text-[var(--brand)]">{fmtPct(lever.completeness)}</span>
+                    </div>
+                    <input type="range" min={0} max={1} step={0.05} value={lever.completeness}
+                      onChange={(e) => updateLever(lever.id, { completeness: +e.target.value })}
+                      className="w-full accent-amber-500" />
+                    <div className="flex flex-wrap gap-x-3 text-[9px] text-[var(--text-muted)]">
+                      {lever.betaDeposit > 0 && <span>↑{fmtPct(lever.betaDeposit)} deposit</span>}
+                      {lever.betaFirstTrade > 0 && <span>↑{fmtPct(lever.betaFirstTrade)} first trade</span>}
+                      {lever.betaRetention > 0 && <span>↑{fmtPct(lever.betaRetention)} retention</span>}
+                      {lever.betaTickets > 0 && <span>↓{fmtPct(lever.betaTickets)} tickets</span>}
+                    </div>
+                  </div>
+                )}
+
+                <Link href={lever.proofRoute}
+                  className="mt-2 flex items-center gap-1 text-[10px] text-[var(--brand)] hover:underline">
+                  <ExternalLink className="w-3 h-3" /> See it work
+                </Link>
+              </div>
+            ))}
+          </div>
+
+          {/* Decision panel */}
+          <div className="card p-4 border border-[var(--brand-border)] bg-[var(--brand-dim)] space-y-2">
+            <div className="flex items-center gap-2 mb-1">
+              <Target className="w-4 h-4 text-[var(--brand)]" />
+              <span className="text-[11px] font-bold text-[var(--brand)]">Decision</span>
+            </div>
+            {decision?.map((d, i) => (
+              <p key={i} className="text-[11px] text-[var(--text-secondary)] flex items-start gap-1.5">
+                <ArrowRight className="w-3 h-3 mt-0.5 text-[var(--brand)] shrink-0" />
+                {d}
+              </p>
+            ))}
+            <div className="pt-2 border-t border-[var(--brand-border)] mt-2">
+              <p className="text-[9px] text-[var(--text-muted)] font-bold mb-1">What would change this call:</p>
+              <ul className="text-[9px] text-[var(--text-muted)] space-y-0.5">
+                <li>• Crew qualification &lt;35% → paid becomes cheaper channel</li>
+                <li>• Retention &lt;30% → LTV:CAC collapses even at low CAC</li>
+                <li>• Trust betas wrong → run Honest Stress scenario</li>
+                <li>• Breakeven &gt; 18mo → raise bridge or cut event cadence</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* Assumption Ledger */}
+          <button onClick={() => setShowLedger(!showLedger)}
+            className="w-full text-[10px] text-[var(--text-secondary)] hover:text-[var(--brand)] flex items-center gap-2 py-1 border border-[var(--border)] rounded px-3">
+            <Info className="w-3 h-3" />
+            {showLedger ? 'Hide' : 'Show'} Assumption Ledger ({result.assumptions.length} entries)
+            {showLedger ? <ChevronUp className="w-3 h-3 ml-auto" /> : <ChevronDown className="w-3 h-3 ml-auto" />}
+          </button>
+
+          <AnimatePresence>
+            {showLedger && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-2"
+              >
+                {result.assumptions.map((a) => (
+                  <div key={a.id} className="card p-2.5 bg-[var(--bg-surface)] space-y-0.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono text-[var(--text-muted)]">{a.id}</span>
+                      <ProvenanceChip type={a.provenance} />
+                    </div>
+                    <div className="text-[10px] font-semibold">{a.label}</div>
+                    <div className="text-[10px] text-[var(--brand)] font-mono">{a.value} {a.unit}</div>
+                    <div className="text-[9px] text-[var(--text-muted)]">{a.source}</div>
+                    <div className="text-[9px] text-[var(--text-muted)]">
+                      Range: [{a.range[0]}, {a.range[1]}] · Confidence: {a.confidence}
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      </div>
     </div>
   );
 }
