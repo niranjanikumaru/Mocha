@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -67,6 +67,7 @@ function KpiCard({ label, value, sub, positive, provenance }: {
 }
 
 export default function DecisionCockpit() {
+  const [mounted, setMounted] = useState(false);
   const [scenarios, setScenarios] = useState<Scenario[]>([...PRESET_SCENARIOS]);
   const [activeScenarioId, setActiveScenarioId] = useState('recommended');
   const [compareScenarioId, setCompareScenarioId] = useState<string | null>('baseline');
@@ -75,6 +76,10 @@ export default function DecisionCockpit() {
   const [showOptimizer, setShowOptimizer] = useState(false);
   const [showJudgeMode, setShowJudgeMode] = useState(true);
   const [judgeModeStep, setJudgeModeStep] = useState(0);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const activeScenario = scenarios.find((s) => s.id === activeScenarioId)!;
   const compareScenario = compareScenarioId ? scenarios.find((s) => s.id === compareScenarioId) : null;
@@ -173,6 +178,17 @@ export default function DecisionCockpit() {
     else parts.push(`Breakeven not reached in 12 months — reduce event spend or increase conversion rates.`);
     return parts;
   }, [inp, lastSnap, result.breakevenMonth]);
+
+  if (!mounted) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] flex items-center justify-center">
+        <div className="flex items-center gap-2 text-[12px] text-[var(--text-muted)]">
+          <div className="w-4 h-4 rounded-full border-2 border-[var(--brand)] border-t-transparent animate-spin" />
+          Loading Decision Cockpit...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)]">
