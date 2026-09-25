@@ -144,38 +144,7 @@ export default function TrustFunnelPage() {
     <div className="min-h-screen bg-[var(--bg-base)] text-[var(--text-primary)] pb-16">
 
       {/* ── SECTION A: HEADER ────────────────────────────────────────────────── */}
-      <header className="border-b border-[var(--border)] bg-[var(--bg-surface)] sticky top-0 z-40">
-        {/* Navigation Breadcrumb */}
-        <div className="h-10 border-b border-[var(--border-subtle)] px-4 flex items-center justify-between text-[11px]">
-          <div className="flex items-center gap-2">
-            <Link
-              href="/"
-              className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1 transition-colors"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Terminal Cockpit
-            </Link>
-            <span className="text-[var(--text-muted)]">/</span>
-            <span className="font-bold text-[var(--brand)]">Market Night Trust &amp; Growth Funnel</span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            <Link
-              href="/market-night"
-              className="text-[11px] text-[var(--text-secondary)] hover:text-[var(--text-primary)] flex items-center gap-1"
-            >
-              Participant Event View <ExternalLink className="w-3 h-3" />
-            </Link>
-            <Link
-              href="/proof/terminal"
-              className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-mono"
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              Proof Terminal
-            </Link>
-          </div>
-        </div>
-
+      <section className="premium-local-controls" aria-label="Growth scenario controls">
         {/* Main Header Content */}
         <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
@@ -257,7 +226,7 @@ export default function TrustFunnelPage() {
             </div>
           </div>
         </div>
-      </header>
+      </section>
 
       {/* ── MAIN DASHBOARD CONTAINER ────────────────────────────────────────── */}
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
@@ -293,6 +262,7 @@ export default function TrustFunnelPage() {
         </section>
 
         {/* ── SECTION E: SEPARATE RETENTION PANEL ────────────────────────────── */}
+        <details className="premium-disclosure"><summary>Retention insights <span>Explore return visits and sustained activity</span></summary>
         <section aria-label="Retention Panel">
           <RetentionPanel
             selectedSnapshot={selectedSnapshot}
@@ -303,8 +273,10 @@ export default function TrustFunnelPage() {
             onOpenIntervention={(id) => setActiveInterventionId(id)}
           />
         </section>
+        </details>
 
         {/* ── INTERVENTIONS SUMMARY / HYPOTHESES LIST ────────────────────────── */}
+        <details className="premium-disclosure"><summary>Trust interventions <span>Inspect and edit the assumptions behind the model</span></summary>
         <section className="card p-4 bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg space-y-3">
           <div className="flex items-center justify-between border-b border-[var(--border)] pb-2">
             <div>
@@ -374,6 +346,7 @@ export default function TrustFunnelPage() {
             ))}
           </div>
         </section>
+        </details>
 
       </main>
 
