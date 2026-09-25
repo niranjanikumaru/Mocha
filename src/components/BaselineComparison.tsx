@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
-import { formatINR, formatINRCompact, formatPct } from '../config/deckNumbers';
+import { formatINR, formatINRCompact, formatPct, DECK_NUMBERS } from '../config/deckNumbers';
 import { ModelInputs, ModelOutput } from '../core/growth/model';
 
 interface BaselineComparisonProps {
@@ -59,11 +59,11 @@ export default function BaselineComparison({
 
   // Channel differences
   const channelItems = [];
-  if (baselineInputs.channel.paidBudgetInr !== proposalInputs.channel.paidBudgetInr) {
+  if (baselineInputs.channel.paidBudgetUsd !== proposalInputs.channel.paidBudgetUsd) {
     channelItems.push({
       label: 'Paid ads budget',
-      baseline: formatINRCompact(baselineInputs.channel.paidBudgetInr) + '/mo',
-      proposal: formatINRCompact(proposalInputs.channel.paidBudgetInr) + '/mo',
+      baseline: formatINRCompact(baselineInputs.channel.paidBudgetUsd * DECK_NUMBERS.exchangeRate) + '/mo',
+      proposal: formatINRCompact(proposalInputs.channel.paidBudgetUsd * DECK_NUMBERS.exchangeRate) + '/mo',
       changed: true,
     });
   }
@@ -201,20 +201,20 @@ export default function BaselineComparison({
               <div>
                 <div className="text-[10px] text-[var(--text-secondary)] mb-0.5">Baseline</div>
                 <div className="text-[16px] font-mono font-bold text-[var(--text-secondary)]">
-                  {formatINRCompact(baseSnap?.volumeInr)}
+                  {formatINRCompact((baseSnap?.volumeUsd ?? 0) * DECK_NUMBERS.exchangeRate)}
                 </div>
               </div>
               <div>
                 <div className="text-[10px] text-[var(--brand)] mb-0.5">Proposal</div>
                 <div className="text-[16px] font-mono font-bold text-[var(--brand)]">
-                  {formatINRCompact(propSnap?.volumeInr)}
+                  {formatINRCompact((propSnap?.volumeUsd ?? 0) * DECK_NUMBERS.exchangeRate)}
                 </div>
               </div>
             </div>
             <div className="mt-2 text-[10px] text-[var(--text-muted)]">
-              Change: <strong className={propSnap.volumeInr >= baseSnap.volumeInr ? 'text-[var(--green)]' : 'text-[var(--red)]'}>
-                {propSnap.volumeInr >= baseSnap.volumeInr ? '+' : ''}{formatINRCompact(propSnap.volumeInr - baseSnap.volumeInr)}
-              </strong> ({formatPct((propSnap.volumeInr - baseSnap.volumeInr) / baseSnap.volumeInr)})
+              Change: <strong className={propSnap.volumeUsd >= baseSnap.volumeUsd ? 'text-[var(--green)]' : 'text-[var(--red)]'}>
+                {propSnap.volumeUsd >= baseSnap.volumeUsd ? '+' : ''}{formatINRCompact((propSnap.volumeUsd - baseSnap.volumeUsd) * DECK_NUMBERS.exchangeRate)}
+              </strong> ({formatPct((propSnap.volumeUsd - baseSnap.volumeUsd) / baseSnap.volumeUsd)})
             </div>
           </div>
 

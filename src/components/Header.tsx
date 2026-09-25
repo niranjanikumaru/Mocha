@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { UserAccountBalance } from '../types/trading';
-import { TrendingUp, Bell, Settings, WifiOff, ShieldCheck, Beaker, Layers } from 'lucide-react';
+import { Bell, Settings, WifiOff } from 'lucide-react';
 import GlowPulse from './ui/glow-pulse';
 import ShimmerText from './ui/shimmer-text';
 
@@ -20,79 +20,7 @@ export default function Header({ balance, feedAge, isSimulated }: HeaderProps) {
       {/* Subtle top gradient line */}
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-[var(--brand)] to-transparent opacity-40" />
 
-      {/* Left — brand */}
-      <div className="flex items-center gap-6">
-        <motion.div
-          className="flex items-center gap-2.5"
-          whileHover={{ scale: 1.02 }}
-          transition={{ type: 'spring', stiffness: 400, damping: 25 }}
-        >
-          <div className="w-7 h-7 rounded-lg bg-[var(--brand)] flex items-center justify-center shadow-[0_0_12px_rgba(245,158,11,0.5)]">
-            <TrendingUp className="w-4 h-4 text-black" strokeWidth={2.5} />
-          </div>
-          <span className="font-extrabold text-[15px] tracking-tight text-[var(--text-primary)]">
-            Mocha<span className="text-[var(--brand)]">Trade</span>
-          </span>
-        </motion.div>
-
-        {/* Nav tabs */}
-        <nav className="hidden md:flex items-center gap-1">
-          {['Positions', 'Orders', 'History', 'Markets'].map((tab, i) => (
-            <motion.button
-              key={tab}
-              whileHover={{ y: -1 }}
-              whileTap={{ scale: 0.97 }}
-              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors ${
-                i === 0
-                  ? 'bg-[var(--bg-interactive)] text-[var(--text-primary)]'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-interactive)]'
-              }`}
-            >
-              {tab}
-            </motion.button>
-          ))}
-          <motion.a
-            href="/trust-funnel"
-            whileHover={{ y: -1, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--brand-dim)] text-[var(--brand)] border border-[var(--brand-border)] hover:bg-[rgba(245,158,11,0.2)] transition-all ml-2"
-          >
-            <Layers className="w-3.5 h-3.5 text-amber-400" />
-            <span>Trust Funnel</span>
-            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">FOUNDER</span>
-          </motion.a>
-          <motion.a
-            href="/market-night"
-            whileHover={{ y: -1, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] transition-all ml-1"
-          >
-            <GlowPulse color="brand" size={8} />
-            <span>Market Night</span>
-            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">CREW PASS</span>
-          </motion.a>
-          <motion.a
-            href="/contract-rules"
-            whileHover={{ y: -1, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-amber-400 border border-amber-500/30 hover:bg-[rgba(245,158,11,0.15)] transition-all ml-1"
-          >
-            <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-            <span>Contract Rules</span>
-            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">SECTION 3</span>
-          </motion.a>
-          <motion.a
-            href="/pricing"
-            whileHover={{ y: -1, scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-purple-400 border border-purple-500/30 hover:bg-[rgba(168,85,247,0.15)] transition-all ml-1"
-          >
-            <Beaker className="w-3.5 h-3.5 text-purple-400" />
-            <span>Fee Lab</span>
-            <span className="badge text-[9px] py-0 px-1 font-mono" style={{ background: 'rgba(168,85,247,0.15)', color: 'rgb(216,180,254)', borderColor: 'rgba(168,85,247,0.3)' }}>PRICING</span>
-          </motion.a>
-        </nav>
-      </div>
+      <span className="terminal-status-title">Trading session</span>
 
       {/* Right — status + balance */}
       <div className="flex items-center gap-4">
