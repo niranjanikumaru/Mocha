@@ -6,7 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   TrendingUp, TrendingDown, ChevronDown, ChevronUp,
   Shield, Zap, Users, BarChart3, Target, AlertTriangle,
-  ArrowRight, Info, ExternalLink, RotateCcw, Plus,
+  ArrowRight, Info, ExternalLink, RotateCcw, Plus, Calendar,
 } from 'lucide-react';
 
 import {
@@ -17,6 +17,9 @@ import {
   PRESET_SCENARIOS, BASELINE_INPUTS, RECOMMENDED_INPUTS, Scenario,
 } from '../core/growth/scenarios';
 import { formatINR, formatINRCompact, formatPct, PROVENANCE_COLORS, Provenance } from '../config/deckNumbers';
+import RolloutPlanner, { Intervention, MarketNightEvent } from '../components/RolloutPlanner';
+import BaselineComparison from '../components/BaselineComparison';
+import MonthlyProjectionsChart from '../components/MonthlyProjectionsChart';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -77,6 +80,78 @@ export default function DecisionCockpit() {
   const [showJudgeMode, setShowJudgeMode] = useState(true);
   const [judgeModeStep, setJudgeModeStep] = useState(0);
 
+  // Rollout Planner State
+  const [selectedMonth, setSelectedMonth] = useState(1);
+  const [showRolloutView, setShowRolloutView] = useState(false);
+  const [rolloutMetric, setRolloutMetric] = useState<'volume' | 'revenue' | 'traders' | 'contribution'>('revenue');
+  
+  // Default interventions based on trust levers
+  const [interventions, setInterventions] = useState<Intervention[]>([
+    {
+      id: 'fit-check',
+      name: 'Funding/Withdrawal Clarity',
+      description: 'Pre-trade eligibility checks and clear withdrawal rules',
+      launchMonth: 1,
+      coverage: 1.0,
+      rampMonths: 0,
+      setupCost: 0,
+      monthlyCost: 0,
+      betaDeposit: 0.03,
+      betaFirstTrade: 0.02,
+      betaRetention: 0.01,
+      betaTickets: -0.15,
+      icon: Shield,
+      color: '#10b981',
+      proofRoute: '/proof/contracts',
+    },
+    {
+      id: 'trade-preview',
+      name: 'Fee/Exposure Preview',
+      description: 'Show exact fee and exposure before confirming trade',
+      launchMonth: 1,
+      coverage: 1.0,
+      rampMonths: 0,
+      setupCost: 0,
+      monthlyCost: 0,
+      betaDeposit: 0.02,
+      betaFirstTrade: 0.08,
+      betaRetention: 0.03,
+      betaTickets: -0.1,
+      icon: Zap,
+      color: '#3b82f6',
+      proofRoute: '/proof/terminal',
+    },
+    {
+      id: 'transaction-recovery',
+      name: 'Transaction Recovery',
+      description: 'Help users recover from mistakes',
+      launchMonth: 3,
+      coverage: 0.8,
+      rampMonths: 2,
+      setupCost: 15000,
+      monthlyCost: 2500,
+      betaDeposit: 0,
+      betaFirstTrade: 0,
+      betaRetention: 0.05,
+      betaTickets: -0.2,
+      icon: AlertTriangle,
+      color: '#f59e0b',
+      proofRoute: '/proof/terminal',
+    },
+  ]);
+
+  const [marketNightEvents, setMarketNightEvents] = useState<MarketNightEvent[]>(
+    Array.from({ length: 12 }, (_, i) => ({
+      month: i + 1,
+      plannedCount: 4,
+      fundedCount: 4,
+      capacity: 48,
+      attendance: 0.75,
+      newProspectShare: 0.85,
+      costPerEvent: 3500,
+    }))
+  );
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -92,6 +167,22 @@ export default function DecisionCockpit() {
 
   const lastSnap = result.snapshots[result.snapshots.length - 1];
   const compareLastSnap = compareResult?.snapshots[compareResult.snapshots.length - 1];
+
+  // Handler for intervention updates
+  const handleInterventionUpdate = useCallback((id: string, updates: Partial<Intervention>) => {
+    setInterventions(prev => prev.map(i => i.id === id ? { ...i, ...updates } : i));
+  }, []);
+
+  // Handler for market night updates
+  const handleMarketNightUpdate = useCallback((month: number, updates: Partial<MarketNightEvent>) => {
+    setMarketNightEvents(prev => prev.map(e => e.month === month ? { ...e, ...updates } : e));
+  }, []);
+
+  // Handler for intervention click (placeholder for future drawer)
+  const handleInterventionClick = useCallback((id: string) => {
+    console.log('Intervention clicked:', id);
+    // TODO: Open intervention editing drawer
+  }, []);
 
   const optimizerData = useMemo(() => {
     if (!showOptimizer) return [];
@@ -422,6 +513,16 @@ export default function DecisionCockpit() {
           <Plus className="w-3 h-3" /> New
         </button>
         <div className="flex-1" />
+        <button
+          onClick={() => setShowRolloutView(!showRolloutView)}
+          className={`px-3 py-2 text-[10px] font-semibold rounded mr-3 flex items-center gap-1.5 transition-colors ${
+            showRolloutView
+              ? 'bg-[var(--brand)] text-black'
+              : 'bg-[var(--bg-interactive)] text-[var(--text-secondary)] hover:text-[var(--brand)]'
+          }`}>
+          <Calendar className="w-3 h-3" />
+          {showRolloutView ? 'Hide' : 'Show'} 12-Month Rollout
+        </button>
         <div className="flex items-center gap-2 text-[10px] text-[var(--text-muted)] pr-2">
           <span className="hidden sm:inline">Compare vs:</span>
           <select value={compareScenarioId || ''} onChange={(e) => setCompareScenarioId(e.target.value || null)}
@@ -1032,6 +1133,119 @@ export default function DecisionCockpit() {
           </AnimatePresence>
         </div>
       </div>
+
+      {/* ── 12-MONTH ROLLOUT PLANNER ──────────────────────────────────────── */}
+      <AnimatePresence>
+        {showRolloutView && compareResult && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="border-t-4 border-[var(--brand-border)] bg-[var(--bg-base)]"
+          >
+            <div className="p-4 space-y-4">
+              {/* Section Header */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
+                    <Calendar className="w-4 h-4 text-[var(--brand)]" />
+                    12-Month Rollout & Projections
+                  </h2>
+                  <p className="text-[10px] text-[var(--text-muted)] mt-1">
+                    Plan intervention launches, track monthly projections, and compare baseline vs proposal
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-[var(--text-muted)]">Chart Metric:</span>
+                  <select
+                    value={rolloutMetric}
+                    onChange={(e) => setRolloutMetric(e.target.value as typeof rolloutMetric)}
+                    className="bg-[var(--bg-interactive)] border border-[var(--border)] rounded px-2 py-1 text-[10px] text-[var(--text-secondary)]"
+                  >
+                    <option value="volume">Executed Volume</option>
+                    <option value="revenue">Service Revenue</option>
+                    <option value="traders">Active Traders</option>
+                    <option value="contribution">Net Contribution</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Rollout Timeline */}
+              <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border)] p-4">
+                <RolloutPlanner
+                  selectedMonth={selectedMonth}
+                  onMonthSelect={setSelectedMonth}
+                  interventions={interventions}
+                  onInterventionUpdate={handleInterventionUpdate}
+                  onInterventionClick={handleInterventionClick}
+                  marketNightEvents={marketNightEvents}
+                  onMarketNightUpdate={handleMarketNightUpdate}
+                  budgetConstraint={200000}
+                />
+              </div>
+
+              {/* Monthly Projections Chart */}
+              <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border)] p-4">
+                <MonthlyProjectionsChart
+                  baselineResult={compareResult}
+                  proposalResult={result}
+                  selectedMonth={selectedMonth}
+                  onMonthSelect={setSelectedMonth}
+                  metric={rolloutMetric}
+                />
+              </div>
+
+              {/* Baseline Comparison */}
+              <div className="bg-[var(--bg-surface)] rounded-lg border border-[var(--border)] p-4">
+                <BaselineComparison
+                  baselineInputs={compareScenario!.inputs}
+                  proposalInputs={activeScenario.inputs}
+                  baselineResult={compareResult}
+                  proposalResult={result}
+                  selectedMonth={selectedMonth}
+                />
+              </div>
+
+              {/* Founder Decision Panel for Rollout */}
+              <div className="card p-4 border-2 border-[var(--brand-border)] bg-[var(--brand-dim)] space-y-3">
+                <div className="flex items-center gap-2 mb-2">
+                  <Target className="w-4 h-4 text-[var(--brand)]" />
+                  <span className="text-[12px] font-bold text-[var(--brand)]">Rollout Decision Analysis</span>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    <ArrowRight className="w-3 h-3 inline mr-1 text-[var(--brand)]" />
+                    Under the selected assumptions, launching{' '}
+                    <strong>{interventions.filter(i => i.launchMonth <= 12).length} interventions</strong> over 12 months
+                    changes year-one contribution by{' '}
+                    <strong className={result.totalContribution12m - compareResult.totalContribution12m >= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'}>
+                      {formatINRCompact(result.totalContribution12m - compareResult.totalContribution12m)}
+                    </strong>
+                  </p>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    <ArrowRight className="w-3 h-3 inline mr-1 text-[var(--brand)]" />
+                    Total intervention costs: {formatINRCompact(interventions.reduce((sum, i) => sum + i.setupCost + (i.monthlyCost * 12), 0))}
+                  </p>
+                  <p className="text-[11px] text-[var(--text-secondary)]">
+                    <ArrowRight className="w-3 h-3 inline mr-1 text-[var(--brand)]" />
+                    Selected Month {selectedMonth}: {fmt(result.snapshots[selectedMonth - 1]?.activeUsers || 0)} active traders,{' '}
+                    {formatINRCompact(result.snapshots[selectedMonth - 1]?.contribution || 0)} net contribution
+                  </p>
+                </div>
+                <div className="pt-2 border-t border-[var(--brand-border)]">
+                  <p className="text-[9px] text-[var(--text-muted)] font-bold mb-1">What to test:</p>
+                  <ul className="text-[9px] text-[var(--text-muted)] space-y-0.5">
+                    <li>• Try launching interventions earlier/later to see impact on breakeven timing</li>
+                    <li>• Test "zero behavioral effect" by setting all beta coefficients to 0</li>
+                    <li>• Compare full rollout vs launching only 1-2 high-impact interventions</li>
+                    <li>• Check budget constraints - red months indicate over-budget</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
