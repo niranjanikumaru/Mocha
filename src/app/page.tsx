@@ -16,26 +16,21 @@ import {
 import {
   PRESET_SCENARIOS, BASELINE_INPUTS, RECOMMENDED_INPUTS, Scenario,
 } from '../core/growth/scenarios';
+import { formatINR, formatINRCompact, formatPct, PROVENANCE_COLORS, Provenance } from '../config/deckNumbers';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n: number, decimals = 0) {
   if (!isFinite(n) || isNaN(n)) return '—';
-  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+  return n.toLocaleString('en-IN', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
 }
-function fmtUsd(n: number) {
-  if (!isFinite(n) || isNaN(n)) return '—';
-  if (Math.abs(n) >= 1000) return '$' + fmt(n / 1000, 1) + 'K';
-  return '$' + fmt(n, 0);
-}
-function fmtPct(n: number) { return fmt(n * 100, 1) + '%'; }
 
 type ProvenanceBadge = { label: string; color: string };
 const PROVENANCE: Record<string, ProvenanceBadge> = {
-  MEASURED: { label: 'MEASURED', color: '#22c55e' },
-  SIMULATED: { label: 'SIMULATED', color: '#f59e0b' },
-  ASSUMED: { label: 'ASSUMED', color: '#7e7e9a' },
-  DERIVED: { label: 'DERIVED', color: '#60a5fa' },
+  MEASURED: { label: 'MEASURED', color: PROVENANCE_COLORS.MEASURED },
+  SIMULATED: { label: 'SIMULATED', color: PROVENANCE_COLORS.SIMULATED },
+  ASSUMED: { label: 'ASSUMED', color: PROVENANCE_COLORS.ASSUMED },
+  DERIVED: { label: 'DERIVED', color: PROVENANCE_COLORS.DERIVED },
 };
 
 function ProvenanceChip({ type }: { type: string }) {
@@ -48,9 +43,9 @@ function ProvenanceChip({ type }: { type: string }) {
   );
 }
 
-function KpiCard({ label, value, sub, positive, provenance }: {
+function KpiCard({ label, value, sub, positive, provenance, explanation }: {
   label: string; value: string; sub?: string;
-  positive?: boolean | null; provenance?: string;
+  positive?: boolean | null; provenance?: string; explanation?: string;
 }) {
   return (
     <div className="card p-3 bg-[var(--bg-surface)] space-y-0.5">
@@ -62,6 +57,11 @@ function KpiCard({ label, value, sub, positive, provenance }: {
         {value}
       </p>
       {sub && <p className="text-[10px] text-[var(--text-muted)]">{sub}</p>}
+      {explanation && (
+        <p className="text-[9px] text-[var(--text-muted)] italic leading-relaxed pt-1 border-t border-[var(--border)]">
+          💡 {explanation}
+        </p>
+      )}
     </div>
   );
 }
@@ -170,7 +170,7 @@ export default function DecisionCockpit() {
     const parts: string[] = [];
     if (feeBps <= 6) parts.push(`Set taker fee at ${feeBps} bps — competitive vs Dhan/Zerodha futures spread.`);
     else parts.push(`Consider reducing taker fee below 8 bps — current ${feeBps} bps suppresses volume via price elasticity.`);
-    if (crewEvents >= 3) parts.push(`Run ${crewEvents} Market Night events/month — crew CAC ${fmtUsd(lastSnap.crewCacUsd)} vs paid ${fmtUsd(lastSnap.paidCacUsd)}.`);
+    if (crewEvents >= 3) parts.push(`Run ${crewEvents} Market Night events/month — crew CAC ${formatINR(lastSnap.crewCacInr, 0)} vs paid ${formatINR(lastSnap.paidCacInr, 0)}.`);
     else parts.push(`Increase Crew Pass cadence — paid channel is carrying all acquisition cost.`);
     if (ltvCac > 3) parts.push(`LTV:CAC ${fmt(ltvCac, 1)}× is healthy. Growth is economically sustainable.`);
     else parts.push(`⚠ LTV:CAC ${fmt(ltvCac, 1)}× below 3× threshold — cut paid spend or improve retention first.`);
@@ -260,6 +260,151 @@ export default function DecisionCockpit() {
         </p>
       </div>
 
+      {/* ── ONE-SCREEN STORY (STEP 1) ─────────────────────────────────────── */}
+      {compareResult && compareLastSnap && (
+        <div className="border-b-2 border-[var(--brand-border)] bg-gradient-to-r from-[var(--brand-dim)] to-[var(--bg-surface)] px-4 py-4">
+          {/* Live Story Sentence */}
+          <div className="mb-4">
+            <p className="text-[14px] leading-relaxed text-[var(--text-primary)]">
+              <span className="font-bold text-[var(--brand)]">With the recommended plan,</span>{' '}
+              Year-1 active traders go from{' '}
+              <span className="font-mono font-bold text-[var(--text-secondary)]">{fmt(compareLastSnap.activeUsers)}</span>{' '}
+              to{' '}
+              <span className="font-mono font-bold text-[var(--brand)]">{fmt(lastSnap.activeUsers)}</span>
+              {lastSnap.activeUsers >= compareLastSnap.activeUsers && (
+                <span className="text-[var(--green)] font-semibold"> (+{fmt(lastSnap.activeUsers - compareLastSnap.activeUsers)})</span>
+              )}
+              {' '}and profit from{' '}
+              <span className="font-mono font-bold text-[var(--text-secondary)]">{formatINRCompact(compareResult.totalContribution12m)}</span>{' '}
+              to{' '}
+              <span className="font-mono font-bold text-[var(--brand)]">{formatINRCompact(result.totalContribution12m)}</span>
+              {result.totalContribution12m >= compareResult.totalContribution12m ? (
+                <span className="text-[var(--green)] font-semibold"> (+{formatINRCompact(result.totalContribution12m - compareResult.totalContribution12m)})</span>
+              ) : (
+                <span className="text-[var(--red)] font-semibold"> ({formatINRCompact(result.totalContribution12m - compareResult.totalContribution12m)})</span>
+              )}
+              {' '}because{' '}
+              <span className="text-[var(--text-primary)]">
+                Crew Pass cuts customer cost from {formatINR(compareLastSnap.blendedCacInr, 0)} to {formatINR(lastSnap.blendedCacInr, 0)} 
+                {' '}while trust features keep them trading longer.
+              </span>
+            </p>
+          </div>
+
+          {/* 3 Headline Numbers: Side-by-Side Comparison */}
+          <div className="grid grid-cols-3 gap-4">
+            {/* Active Traders */}
+            <div className="bg-[var(--bg-surface)] rounded-lg p-4 border border-[var(--border)]">
+              <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider mb-2">Active Traders (Year 1)</div>
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--text-secondary)] mb-1">Baseline</div>
+                  <div className="text-[20px] font-mono font-bold text-[var(--text-secondary)]">{fmt(compareLastSnap.activeUsers)}</div>
+                </div>
+                <div className="flex items-center justify-center">
+                  <ArrowRight className="w-4 h-4 text-[var(--brand)]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--brand)] mb-1">Recommended</div>
+                  <div className="text-[20px] font-mono font-bold text-[var(--brand)]">{fmt(lastSnap.activeUsers)}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-1">
+                {lastSnap.activeUsers >= compareLastSnap.activeUsers ? (
+                  <>
+                    <TrendingUp className="w-3 h-3 text-[var(--green)]" />
+                    <span className="text-[11px] font-semibold text-[var(--green)]">
+                      +{fmt(lastSnap.activeUsers - compareLastSnap.activeUsers)} ({formatPct((lastSnap.activeUsers - compareLastSnap.activeUsers) / compareLastSnap.activeUsers)})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="w-3 h-3 text-[var(--red)]" />
+                    <span className="text-[11px] font-semibold text-[var(--red)]">
+                      {fmt(lastSnap.activeUsers - compareLastSnap.activeUsers)} ({formatPct((lastSnap.activeUsers - compareLastSnap.activeUsers) / compareLastSnap.activeUsers)})
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Revenue */}
+            <div className="bg-[var(--bg-surface)] rounded-lg p-4 border border-[var(--border)]">
+              <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider mb-2">12-Month Revenue</div>
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--text-secondary)] mb-1">Baseline</div>
+                  <div className="text-[20px] font-mono font-bold text-[var(--text-secondary)]">{formatINRCompact(compareResult.totalRevenue12m)}</div>
+                </div>
+                <div className="flex items-center justify-center">
+                  <ArrowRight className="w-4 h-4 text-[var(--brand)]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--brand)] mb-1">Recommended</div>
+                  <div className="text-[20px] font-mono font-bold text-[var(--brand)]">{formatINRCompact(result.totalRevenue12m)}</div>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-1">
+                {result.totalRevenue12m >= compareResult.totalRevenue12m ? (
+                  <>
+                    <TrendingUp className="w-3 h-3 text-[var(--green)]" />
+                    <span className="text-[11px] font-semibold text-[var(--green)]">
+                      +{formatINRCompact(result.totalRevenue12m - compareResult.totalRevenue12m)} ({formatPct((result.totalRevenue12m - compareResult.totalRevenue12m) / compareResult.totalRevenue12m)})
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="w-3 h-3 text-[var(--red)]" />
+                    <span className="text-[11px] font-semibold text-[var(--red)]">
+                      {formatINRCompact(result.totalRevenue12m - compareResult.totalRevenue12m)} ({formatPct((result.totalRevenue12m - compareResult.totalRevenue12m) / compareResult.totalRevenue12m)})
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Profit (Contribution) */}
+            <div className="bg-[var(--bg-surface)] rounded-lg p-4 border border-[var(--border)]">
+              <div className="text-[9px] text-[var(--text-muted)] uppercase tracking-wider mb-2">12-Month Profit</div>
+              <div className="flex items-end justify-between gap-3">
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--text-secondary)] mb-1">Baseline</div>
+                  <div className={`text-[20px] font-mono font-bold ${compareResult.totalContribution12m >= 0 ? 'text-[var(--text-secondary)]' : 'text-[var(--red)]'}`}>
+                    {formatINRCompact(compareResult.totalContribution12m)}
+                  </div>
+                </div>
+                <div className="flex items-center justify-center">
+                  <ArrowRight className="w-4 h-4 text-[var(--brand)]" />
+                </div>
+                <div className="flex-1">
+                  <div className="text-[10px] text-[var(--brand)] mb-1">Recommended</div>
+                  <div className={`text-[20px] font-mono font-bold ${result.totalContribution12m >= 0 ? 'text-[var(--brand)]' : 'text-[var(--red)]'}`}>
+                    {formatINRCompact(result.totalContribution12m)}
+                  </div>
+                </div>
+              </div>
+              <div className="mt-2 flex items-center gap-1">
+                {result.totalContribution12m >= compareResult.totalContribution12m ? (
+                  <>
+                    <TrendingUp className="w-3 h-3 text-[var(--green)]" />
+                    <span className="text-[11px] font-semibold text-[var(--green)]">
+                      +{formatINRCompact(result.totalContribution12m - compareResult.totalContribution12m)}
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <TrendingDown className="w-3 h-3 text-[var(--red)]" />
+                    <span className="text-[11px] font-semibold text-[var(--red)]">
+                      {formatINRCompact(result.totalContribution12m - compareResult.totalContribution12m)}
+                    </span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Scenario Tabs ─────────────────────────────────────────────────── */}
       <div className="border-b border-[var(--border)] bg-[var(--bg-surface)] px-4 flex items-center gap-0 overflow-x-auto">
         {scenarios.map((s) => (
@@ -315,21 +460,38 @@ export default function DecisionCockpit() {
               Pricing
             </h3>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Taker fee</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Fee per trade
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="On ₹50,000 trade: 2 bps = ₹10, 5 bps = ₹25, 10 bps = ₹50">
+                    ⓘ
+                  </span>
+                </span>
                 <span className="font-mono text-[var(--brand)]">{inp.pricing.takerFeeBps} bps</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)] leading-relaxed">
+                Lower fee = more traders stay, but less money per trade. 
+                At <strong>{inp.pricing.takerFeeBps} bps</strong> on ₹50,000 trade = <strong>{formatINR(50000 * inp.pricing.takerFeeBps / 10000, 0)}</strong>
               </div>
               <input type="range" min={1} max={20} step={0.5} value={inp.pricing.takerFeeBps}
                 onChange={(e) => updateInput('pricing.takerFeeBps', +e.target.value)}
                 className="w-full accent-amber-500" />
               <div className="flex justify-between text-[9px] text-[var(--text-muted)]">
-                <span>1 bps</span><ProvenanceChip type="ASSUMED" /><span>20 bps</span>
+                <span>1 bps (₹5)</span><ProvenanceChip type="ASSUMED" /><span>20 bps (₹100)</span>
               </div>
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>FX spread</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Currency conversion fee
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="When depositing INR that gets converted to USD for trading">
+                    ⓘ
+                  </span>
+                </span>
                 <span className="font-mono text-[var(--brand)]">{inp.pricing.fxSpreadPct}%</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)]">
+                On ₹10,000 deposit = {formatINR(10000 * inp.pricing.fxSpreadPct / 100, 0)} fee
               </div>
               <input type="range" min={0.1} max={0.5} step={0.05} value={inp.pricing.fxSpreadPct}
                 onChange={(e) => updateInput('pricing.fxSpreadPct', +e.target.value)}
@@ -340,21 +502,37 @@ export default function DecisionCockpit() {
 
           {/* Channels */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">Channels</h3>
+            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">How We Get Traders</h3>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Paid budget</span>
-                <span className="font-mono text-[var(--brand)]">{fmtUsd(inp.channel.paidBudgetUsd)}/mo</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Paid ads budget
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="Google/Facebook ads, influencer sponsorships">
+                    ⓘ
+                  </span>
+                </span>
+                <span className="font-mono text-[var(--brand)]">{formatINRCompact(inp.channel.paidBudgetInr)}/mo</span>
               </div>
-              <input type="range" min={0} max={20000} step={500} value={inp.channel.paidBudgetUsd}
-                onChange={(e) => updateInput('channel.paidBudgetUsd', +e.target.value)}
+              <div className="text-[9px] text-[var(--text-muted)]">
+                At ₹{inp.channel.paidCostPerSignup.toLocaleString('en-IN')} per signup = {fmt(inp.channel.paidBudgetInr / inp.channel.paidCostPerSignup, 0)} new traders/month
+              </div>
+              <input type="range" min={0} max={200000} step={5000} value={inp.channel.paidBudgetInr}
+                onChange={(e) => updateInput('channel.paidBudgetInr', +e.target.value)}
                 className="w-full accent-amber-500" />
               <ProvenanceChip type="ASSUMED" />
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Market Night events/mo</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Market Night events/month
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="Team-based trading events where 4 people learn together">
+                    ⓘ
+                  </span>
+                </span>
                 <span className="font-mono text-[var(--brand)]">{inp.channel.crewEventsPerMonth}</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)]">
+                Each event = {inp.channel.crewsPerEvent} crews × 4 people = {inp.channel.crewsPerEvent * 4} invites
               </div>
               <input type="range" min={0} max={16} step={1} value={inp.channel.crewEventsPerMonth}
                 onChange={(e) => updateInput('channel.crewEventsPerMonth', +e.target.value)}
@@ -372,9 +550,17 @@ export default function DecisionCockpit() {
               <ProvenanceChip type="ASSUMED" />
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Crew join rate</span>
-                <span className="font-mono text-[var(--brand)]">{fmtPct(inp.channel.crewJoinRate)}</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Event → signup rate
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="How many event attendees actually join the platform">
+                    ⓘ
+                  </span>
+                </span>
+                <span className="font-mono text-[var(--brand)]">{formatPct(inp.channel.crewJoinRate)}</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)]">
+                Out of 12 people at event, {fmt(12 * inp.channel.crewJoinRate, 0)} join
               </div>
               <input type="range" min={0.1} max={0.95} step={0.01} value={inp.channel.crewJoinRate}
                 onChange={(e) => updateInput('channel.crewJoinRate', +e.target.value)}
@@ -385,21 +571,37 @@ export default function DecisionCockpit() {
 
           {/* Volume & Funnel */}
           <div className="space-y-3">
-            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">Volume & Funnel</h3>
+            <h3 className="text-[11px] font-semibold text-[var(--text-secondary)]">Trader Behavior</h3>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Volume / active user</span>
-                <span className="font-mono text-[var(--brand)]">{fmtUsd(inp.baseVolumePerActiveUsd)}/mo</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Trading volume per person
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="Total rupee value of trades each active trader makes per month">
+                    ⓘ
+                  </span>
+                </span>
+                <span className="font-mono text-[var(--brand)]">{formatINRCompact(inp.baseVolumePerActiveInr)}/mo</span>
               </div>
-              <input type="range" min={200} max={10000} step={100} value={inp.baseVolumePerActiveUsd}
-                onChange={(e) => updateInput('baseVolumePerActiveUsd', +e.target.value)}
+              <div className="text-[9px] text-[var(--text-muted)]">
+                More volume = more fees collected. At {inp.pricing.takerFeeBps} bps = {formatINR(inp.baseVolumePerActiveInr * inp.pricing.takerFeeBps / 10000, 0)}/trader/month
+              </div>
+              <input type="range" min={50000} max={500000} step={10000} value={inp.baseVolumePerActiveInr}
+                onChange={(e) => updateInput('baseVolumePerActiveInr', +e.target.value)}
                 className="w-full accent-amber-500" />
               <ProvenanceChip type="ASSUMED" />
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Monthly retention</span>
-                <span className="font-mono text-[var(--brand)]">{fmtPct(inp.funnelRetention)}</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Traders who stay each month
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="If 100 traders this month, how many still trade next month?">
+                    ⓘ
+                  </span>
+                </span>
+                <span className="font-mono text-[var(--brand)]">{formatPct(inp.funnelRetention)}</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)]">
+                Out of 100 traders, {fmt(100 * inp.funnelRetention, 0)} come back next month
               </div>
               <input type="range" min={0.1} max={0.9} step={0.01} value={inp.funnelRetention}
                 onChange={(e) => updateInput('funnelRetention', +e.target.value)}
@@ -407,9 +609,19 @@ export default function DecisionCockpit() {
               <ProvenanceChip type="ASSUMED" />
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Price elasticity ε</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Fee sensitivity
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="How much traders reduce volume when fees go up. Higher = more sensitive">
+                    ⓘ
+                  </span>
+                </span>
                 <span className="font-mono text-[var(--brand)]">{inp.priceElasticity.toFixed(1)}</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)]">
+                {inp.priceElasticity < 0.5 ? 'Not sensitive - traders trade the same even with higher fees' : 
+                 inp.priceElasticity < 1 ? 'Somewhat sensitive - some reduce trading when fees rise' :
+                 'Very sensitive - traders cut way back when fees rise'}
               </div>
               <input type="range" min={0.2} max={2.0} step={0.1} value={inp.priceElasticity}
                 onChange={(e) => updateInput('priceElasticity', +e.target.value)}
@@ -417,14 +629,22 @@ export default function DecisionCockpit() {
               <ProvenanceChip type="ASSUMED" />
             </div>
             <div className="space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span>Trust dampening θ</span>
+              <div className="flex justify-between text-[11px] items-center gap-2">
+                <span className="flex items-center gap-1">
+                  Trust protection effect
+                  <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="How much trust features reduce fee sensitivity. Higher = trust makes users less price-conscious">
+                    ⓘ
+                  </span>
+                </span>
                 <span className="font-mono text-[var(--brand)]">{inp.trustElasticityDampening.toFixed(2)}</span>
+              </div>
+              <div className="text-[9px] text-[var(--text-muted)] leading-relaxed">
+                When traders trust the platform, they care less about fees. 
+                {inp.trustElasticityDampening > 0.3 ? ' Strong effect!' : inp.trustElasticityDampening > 0.15 ? ' Moderate effect.' : ' Weak effect.'}
               </div>
               <input type="range" min={0} max={0.5} step={0.01} value={inp.trustElasticityDampening}
                 onChange={(e) => updateInput('trustElasticityDampening', +e.target.value)}
                 className="w-full accent-amber-500" />
-              <div className="text-[9px] text-[var(--text-muted)]">How much trust reduces fee sensitivity</div>
               <ProvenanceChip type="ASSUMED" />
             </div>
           </div>
@@ -440,25 +660,45 @@ export default function DecisionCockpit() {
 
           {/* KPI Strip */}
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            <KpiCard label="Blended CAC"
-              value={fmtUsd(lastSnap?.blendedCacUsd || 0)}
-              sub={compareLastSnap ? `vs ${fmtUsd(compareLastSnap.blendedCacUsd)} (${compareScenario?.name})` : undefined}
-              positive={compareLastSnap ? (lastSnap.blendedCacUsd < compareLastSnap.blendedCacUsd) : null}
-              provenance="DERIVED" />
-            <KpiCard label="LTV:CAC"
-              value={fmt(lastSnap?.ltvCacRatio || 0, 1) + '×'}
+            <KpiCard 
+              label="Cost to get 1 trader"
+              value={formatINR(lastSnap?.blendedCacInr || 0, 0)}
+              sub={compareLastSnap ? `vs ${formatINR(compareLastSnap.blendedCacInr, 0)} (${compareScenario?.name})` : undefined}
+              positive={compareLastSnap ? (lastSnap.blendedCacInr < compareLastSnap.blendedCacInr) : null}
+              provenance="DERIVED"
+              explanation="Lower is better. Mix of paid ads + Market Night events + referrals." 
+            />
+            <KpiCard 
+              label="Does each trader earn back their cost?"
+              value={(() => {
+                const ratio = lastSnap?.ltvCacRatio || 0;
+                const emoji = ratio < 1 ? '🔴' : ratio < 3 ? '🟡' : '🟢';
+                return `${emoji} ${fmt(ratio, 1)}×`;
+              })()}
               sub={compareLastSnap ? `baseline: ${fmt(compareLastSnap.ltvCacRatio, 1)}×` : undefined}
               positive={compareLastSnap ? (lastSnap.ltvCacRatio > compareLastSnap.ltvCacRatio) : null}
-              provenance="DERIVED" />
-            <KpiCard label="12-mo Revenue"
-              value={fmtUsd(result.totalRevenue12m)}
-              sub={compareResult ? `vs ${fmtUsd(compareResult.totalRevenue12m)}` : undefined}
+              provenance="DERIVED"
+              explanation={
+                lastSnap?.ltvCacRatio < 1 ? "🔴 Under 1× = losing money on each trader" :
+                lastSnap?.ltvCacRatio < 3 ? "🟡 1-3× = barely profitable, risky" :
+                "🟢 Over 3× = healthy, each trader earns back 3x+ their cost"
+              }
+            />
+            <KpiCard 
+              label="12-month revenue"
+              value={formatINRCompact(result.totalRevenue12m)}
+              sub={compareResult ? `vs ${formatINRCompact(compareResult.totalRevenue12m)}` : undefined}
               positive={compareResult ? (result.totalRevenue12m > compareResult.totalRevenue12m) : null}
-              provenance="DERIVED" />
-            <KpiCard label="Breakeven"
+              provenance="DERIVED"
+              explanation="Trading fees + currency conversion fees from all traders."
+            />
+            <KpiCard 
+              label="When do we break even?"
               value={result.breakevenMonth ? `Month ${result.breakevenMonth}` : '> 12 mo'}
               positive={result.breakevenMonth !== null && result.breakevenMonth <= 9}
-              provenance="DERIVED" />
+              provenance="DERIVED"
+              explanation="When total profit becomes positive (revenue > costs)."
+            />
           </div>
 
           {/* Revenue chart */}
@@ -553,7 +793,7 @@ export default function DecisionCockpit() {
                   <p className="text-[20px] font-mono font-bold" style={{ color }}>{fmt(val)}</p>
                   <p className="text-[9px] text-[var(--text-muted)]">{label}</p>
                   <p className="text-[9px] text-[var(--text-muted)]">
-                    {lastSnap?.totalSignups ? fmtPct(val / lastSnap.totalSignups) : '0%'}
+                    {lastSnap?.totalSignups ? formatPct(val / lastSnap.totalSignups) : '0%'}
                   </p>
                 </div>
               ))}
@@ -565,15 +805,20 @@ export default function DecisionCockpit() {
             <button onClick={() => setShowOptimizer(!showOptimizer)}
               className="w-full flex items-center justify-between p-4 text-[11px] font-semibold hover:bg-[var(--bg-hover)]">
               <span className="flex items-center gap-2">
-                <Target className="w-4 h-4 text-[var(--brand)]" /> Pricing Optimiser
+                <Target className="w-4 h-4 text-[var(--brand)]" /> 
+                What fee makes the most money?
+                <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="Tests every fee from 1-20 bps to find the most profitable">
+                  ⓘ
+                </span>
               </span>
               {showOptimizer ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {showOptimizer && (
               <div className="px-4 pb-4 space-y-3 border-t border-[var(--border)]">
                 <p className="text-[10px] text-[var(--text-muted)] pt-2">
-                  Sweeps taker fee 1–20 bps; holds all else constant. Green = optimal. Amber = current.
-                  Key thesis: higher T → optimal fee shifts right.
+                  Tests every fee 1–20 bps while keeping everything else the same. 
+                  <strong className="text-[var(--green)]"> Green = makes most profit.</strong>
+                  {' '}<strong className="text-[var(--brand)]">Orange = current setting.</strong>
                 </p>
                 {optPoint && (
                   <div className="flex gap-6">
@@ -583,7 +828,7 @@ export default function DecisionCockpit() {
                     </div>
                     <div>
                       <p className="text-[10px] text-[var(--text-muted)]">Max 12-mo contribution</p>
-                      <p className="text-[20px] font-mono font-bold text-[var(--green)]">{fmtUsd(optPoint.contribution)}</p>
+                      <p className="text-[20px] font-mono font-bold text-[var(--green)]">{formatINRCompact(optPoint.contribution)}</p>
                     </div>
                     <div>
                       <p className="text-[10px] text-[var(--text-muted)]">Current fee</p>
@@ -602,7 +847,7 @@ export default function DecisionCockpit() {
                     return (
                       <div key={p.feeBps} className="flex-1 rounded-t"
                         style={{ height: `${h}%`, background: isOpt ? '#22c55e' : isCurr ? '#f59e0b' : '#252535' }}
-                        title={`${p.feeBps} bps → ${fmtUsd(p.contribution)}`} />
+                        title={`${p.feeBps} bps → ${formatINRCompact(p.contribution)}`} />
                     );
                   })}
                 </div>
@@ -622,20 +867,25 @@ export default function DecisionCockpit() {
             <button onClick={() => setShowSensitivity(!showSensitivity)}
               className="w-full flex items-center justify-between p-4 text-[11px] font-semibold hover:bg-[var(--bg-hover)]">
               <span className="flex items-center gap-2">
-                <BarChart3 className="w-4 h-4 text-[var(--brand)]" /> Sensitivity Tornado (top 8)
+                <BarChart3 className="w-4 h-4 text-[var(--brand)]" /> 
+                What could hurt us most? (top 8 risks)
+                <span className="text-[9px] text-[var(--text-muted)] cursor-help" title="Shows which assumptions have the biggest impact on profit if they're wrong">
+                  ⓘ
+                </span>
               </span>
               {showSensitivity ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
             </button>
             {showSensitivity && (
               <div className="px-4 pb-4 space-y-2 border-t border-[var(--border)]">
                 <p className="text-[10px] text-[var(--text-muted)] pt-2">
-                  ±swing on 12-mo contribution when each assumption moves ±20–50%. Widest bar = biggest model risk.
+                  If each assumption changes by ±20-50%, how much does year-end profit swing? 
+                  <strong> Widest bar = biggest risk.</strong>
                 </p>
                 {tornadoData.map((t) => (
                   <div key={t.assumptionId} className="space-y-0.5">
                     <div className="flex justify-between text-[10px]">
                       <span className="text-[var(--text-secondary)]">{t.label} <span className="text-[var(--text-muted)]">({t.assumptionId})</span></span>
-                      <span className="text-[var(--text-muted)] font-mono">{fmtUsd(t.swing)}</span>
+                      <span className="text-[var(--text-muted)] font-mono">{formatINRCompact(t.swing)}</span>
                     </div>
                     <div className="h-3 bg-[var(--bg-interactive)] rounded overflow-hidden flex">
                       <div className="flex-1 flex items-center justify-end pr-px">
@@ -663,7 +913,7 @@ export default function DecisionCockpit() {
             <div className="flex items-center justify-between">
               <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-muted)]">Trust Ladder</span>
               <span className="text-[15px] font-mono font-bold text-[var(--brand)]">
-                T = {fmtPct(lastSnap?.trustScore || 0)}
+                T = {formatPct(lastSnap?.trustScore || 0)}
               </span>
             </div>
             <div className="h-2 bg-[var(--bg-interactive)] rounded overflow-hidden">
@@ -702,16 +952,16 @@ export default function DecisionCockpit() {
                   <div className="mt-2 space-y-1">
                     <div className="flex justify-between text-[10px]">
                       <span className="text-[var(--text-muted)]">Completeness</span>
-                      <span className="font-mono text-[var(--brand)]">{fmtPct(lever.completeness)}</span>
+                      <span className="font-mono text-[var(--brand)]">{formatPct(lever.completeness)}</span>
                     </div>
                     <input type="range" min={0} max={1} step={0.05} value={lever.completeness}
                       onChange={(e) => updateLever(lever.id, { completeness: +e.target.value })}
                       className="w-full accent-amber-500" />
                     <div className="flex flex-wrap gap-x-3 text-[9px] text-[var(--text-muted)]">
-                      {lever.betaDeposit > 0 && <span>↑{fmtPct(lever.betaDeposit)} deposit</span>}
-                      {lever.betaFirstTrade > 0 && <span>↑{fmtPct(lever.betaFirstTrade)} first trade</span>}
-                      {lever.betaRetention > 0 && <span>↑{fmtPct(lever.betaRetention)} retention</span>}
-                      {lever.betaTickets > 0 && <span>↓{fmtPct(lever.betaTickets)} tickets</span>}
+                      {lever.betaDeposit > 0 && <span>↑{formatPct(lever.betaDeposit)} deposit</span>}
+                      {lever.betaFirstTrade > 0 && <span>↑{formatPct(lever.betaFirstTrade)} first trade</span>}
+                      {lever.betaRetention > 0 && <span>↑{formatPct(lever.betaRetention)} retention</span>}
+                      {lever.betaTickets > 0 && <span>↓{formatPct(lever.betaTickets)} tickets</span>}
                     </div>
                   </div>
                 )}
