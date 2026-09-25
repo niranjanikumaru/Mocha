@@ -20,6 +20,7 @@ import { formatINR, formatINRCompact, formatPct, PROVENANCE_COLORS, Provenance }
 import RolloutPlanner, { Intervention, MarketNightEvent } from '../components/RolloutPlanner';
 import BaselineComparison from '../components/BaselineComparison';
 import MonthlyProjectionsChart from '../components/MonthlyProjectionsChart';
+import { runRolloutProjection } from '../core/growth/rolloutProjection';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -159,7 +160,16 @@ export default function DecisionCockpit() {
   const activeScenario = scenarios.find((s) => s.id === activeScenarioId)!;
   const compareScenario = compareScenarioId ? scenarios.find((s) => s.id === compareScenarioId) : null;
 
-  const result = useMemo(() => runModel(activeScenario.inputs), [activeScenario.inputs]);
+  // Use rollout projection if rollout view is active and interventions are defined
+  const hasActiveInterventions = interventions.some(i => i.launchMonth <= 12);
+  
+  const result = useMemo(() => {
+    if (showRolloutView && hasActiveInterventions) {
+      return runRolloutProjection(activeScenario.inputs, interventions);
+    }
+    return runModel(activeScenario.inputs);
+  }, [activeScenario.inputs, showRolloutView, hasActiveInterventions, interventions]);
+  
   const compareResult = useMemo(
     () => (compareScenario ? runModel(compareScenario.inputs) : null),
     [compareScenario]
@@ -1150,9 +1160,17 @@ export default function DecisionCockpit() {
                   <h2 className="text-[14px] font-bold text-[var(--text-primary)] flex items-center gap-2">
                     <Calendar className="w-4 h-4 text-[var(--brand)]" />
                     12-Month Rollout & Projections
+                    {hasActiveInterventions && (
+                      <span className="px-2 py-0.5 text-[9px] font-bold bg-[var(--brand)] text-black rounded-full">
+                        ACTIVE
+                      </span>
+                    )}
                   </h2>
                   <p className="text-[10px] text-[var(--text-muted)] mt-1">
-                    Plan intervention launches, track monthly projections, and compare baseline vs proposal
+                    {hasActiveInterventions 
+                      ? `Projections include ${interventions.filter(i => i.launchMonth <= 12).length} interventions with ramped effects and costs`
+                      : 'Plan intervention launches, track monthly projections, and compare baseline vs proposal'
+                    }
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
