@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { UserAccountBalance } from '../types/trading';
-import { TrendingUp, Bell, Settings, WifiOff, ShieldCheck } from 'lucide-react';
+import { TrendingUp, Bell, Settings, WifiOff, ShieldCheck, Beaker, Layers } from 'lucide-react';
 import GlowPulse from './ui/glow-pulse';
 import ShimmerText from './ui/shimmer-text';
 
@@ -52,10 +52,20 @@ export default function Header({ balance, feedAge, isSimulated }: HeaderProps) {
             </motion.button>
           ))}
           <motion.a
-            href="/market-night"
+            href="/trust-funnel"
             whileHover={{ y: -1, scale: 1.02 }}
             whileTap={{ scale: 0.97 }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--brand-dim)] text-[var(--brand)] border border-[var(--brand-border)] hover:bg-[rgba(245,158,11,0.2)] transition-all ml-2"
+          >
+            <Layers className="w-3.5 h-3.5 text-amber-400" />
+            <span>Trust Funnel</span>
+            <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">FOUNDER</span>
+          </motion.a>
+          <motion.a
+            href="/market-night"
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] border border-[var(--border)] transition-all ml-1"
           >
             <GlowPulse color="brand" size={8} />
             <span>Market Night</span>
@@ -70,6 +80,16 @@ export default function Header({ balance, feedAge, isSimulated }: HeaderProps) {
             <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
             <span>Contract Rules</span>
             <span className="badge badge-brand text-[9px] py-0 px-1 font-mono">SECTION 3</span>
+          </motion.a>
+          <motion.a
+            href="/pricing"
+            whileHover={{ y: -1, scale: 1.02 }}
+            whileTap={{ scale: 0.97 }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-[13px] font-semibold bg-[var(--bg-interactive)] text-purple-400 border border-purple-500/30 hover:bg-[rgba(168,85,247,0.15)] transition-all ml-1"
+          >
+            <Beaker className="w-3.5 h-3.5 text-purple-400" />
+            <span>Fee Lab</span>
+            <span className="badge text-[9px] py-0 px-1 font-mono" style={{ background: 'rgba(168,85,247,0.15)', color: 'rgb(216,180,254)', borderColor: 'rgba(168,85,247,0.3)' }}>PRICING</span>
           </motion.a>
         </nav>
       </div>

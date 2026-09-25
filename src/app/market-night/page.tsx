@@ -16,6 +16,7 @@ import EventWorkspaceScreen from '../../components/MarketNight/EventWorkspaceScr
 import CrewPassScreen from '../../components/MarketNight/CrewPassScreen';
 import MarketNightCelebration from '../../components/MarketNight/MarketNightCelebration';
 import MarketNightJudgeDemo from '../../components/MarketNight/MarketNightJudgeDemo';
+import FeeExperimentPanel from '../../components/MarketNight/FeeExperimentPanel';
 import RetroGrid from '../../components/ui/retro-grid';
 import AuroraBackground from '../../components/ui/aurora-background';
 
@@ -24,7 +25,7 @@ import {
   Award, Clock, CheckCircle2, ChevronRight, Zap, Shield
 } from 'lucide-react';
 
-type TabView = 'EVENT_DISCOVERY' | 'TEAM_LOBBY' | 'WORKSPACE' | 'CREW_PASS';
+type TabView = 'EVENT_DISCOVERY' | 'TEAM_LOBBY' | 'WORKSPACE' | 'CREW_PASS' | 'FEE_EXPERIMENT';
 
 export default function MarketNightPage() {
   // Current user (defaults to Captain Priya)
@@ -210,6 +211,7 @@ export default function MarketNightPage() {
             { id: 'TEAM_LOBBY' as const, label: '2. Team Lobby', enabled: !!team },
             { id: 'WORKSPACE' as const, label: '3. Event Workspace', enabled: isQualified },
             { id: 'CREW_PASS' as const, label: '4. Crew Pass & Reports', enabled: isQualified },
+            { id: 'FEE_EXPERIMENT' as const, label: '5. Fee Experiment', enabled: true },
           ].map((tab) => (
             <button
               key={tab.id}
@@ -286,6 +288,10 @@ export default function MarketNightPage() {
             onSubmitQuestion={handleSubmitQuestion}
             onRsvpNextWeek={handleRsvpNextWeek}
           />
+        )}
+
+        {activeTab === 'FEE_EXPERIMENT' && (
+          <FeeExperimentPanel />
         )}
 
         {/* ── Judge Demo Bar & Growth Mechanism ── */}

@@ -17,11 +17,15 @@ export interface MarketNightEvent {
   title: string;
   theme: string;
   description: string;
-  scheduledTime: number;          // Timestamp of event start
-  checkInWindowStart: number;     // Window opens 15m before
-  checkInWindowEnd: number;       // Window closes 45m after start
+  scheduledTime: number;
+  checkInWindowStart: number;
+  checkInWindowEnd: number;
   status: EventStatus;
-  minCrewSize: number;            // 4 members
+  minCrewSize: number;
+  hostName: string;
+  checkInCode: string;      // 6-char code displayed by host at event
+  reservationCount: number;
+  hostingCostINR: number;
 }
 
 export interface TeamMember {
@@ -36,6 +40,24 @@ export interface TeamMember {
 }
 
 export interface BenefitBundle {
+  workshopAccess: {
+    unlocked: boolean;
+    unlockedAt?: number;
+    title: string;
+    description: string;
+  };
+  sessionToolkit: {
+    unlocked: boolean;
+    unlockedAt?: number;
+    isDownloadable: boolean;
+    items: string[];
+  };
+  replayAccess: {
+    unlocked: boolean;
+    unlockedAt?: number;
+    availableAfterSession: boolean;
+  };
+  // Legacy names kept for backward compat
   exclusiveScenario: {
     unlocked: boolean;
     unlockedAt?: number;
@@ -46,9 +68,9 @@ export interface BenefitBundle {
   teamAnalysisReport: {
     unlocked: boolean;
     unlockedAt?: number;
-    isDownloadable: boolean;     // Available after scenario completion
+    isDownloadable: boolean;
     summaryMetrics?: {
-      consensusScore: number;     // e.g. 75%
+      consensusScore: number;
       divergenceNotes: string;
     };
   };
@@ -64,27 +86,63 @@ export interface BenefitBundle {
 
 export interface CrewTeam {
   id: string;
-  code: string;                  // e.g. 'CREW-8492'
+  code: string;
   name: string;
   captainId: string;
   members: TeamMember[];
-  isQualified: boolean;          // Exactly 4 distinct checked in
+  isQualified: boolean;
   qualifiedAt?: number;
   benefits: BenefitBundle;
-  disconnectionResilient: boolean; // Once qualified, remains true
+  disconnectionResilient: boolean;
 }
 
-export type ScenarioPhase = 'PRIVATE_DECISION' | 'SURPRISE_REVEAL' | 'REVISION_DEBRIEF' | 'COMPLETED';
+export type ScenarioPhase =
+  | 'PRIVATE_DECISION'
+  | 'SURPRISE_REVEAL'
+  | 'REVISION_DEBRIEF'
+  | 'COMPLETED';
+
+export type PollInfluenceOption =
+  | 'MARKET_VIEW'
+  | 'POSITION_EXPOSURE'
+  | 'TRADING_COSTS'
+  | 'LIQUIDATION_RISK'
+  | 'INSUFFICIENT_INFO';
+
+export type TransactionStatus =
+  | 'AWAITING_APPROVAL'
+  | 'SUBMITTED'
+  | 'CHECKING_OUTCOME'
+  | 'CONFIRMED'
+  | 'REJECTED'
+  | 'UNCERTAIN';
+
+export interface TransactionRecord {
+  ref: string;
+  status: TransactionStatus;
+  statusHistory: { status: TransactionStatus; timestamp: number; note?: string }[];
+  confirmedAt?: number;
+  rejectedReason?: string;
+  isDuplicate: boolean;
+}
 
 export interface MemberDecision {
   userId: string;
   userName: string;
-  initialChoice: 'LONG_MOMENTUM' | 'SHORT_HEDGE' | 'DE_RISK_CASH';
+  initialChoice: 'LONG_MOMENTUM' | 'SHORT_HEDGE' | 'DE_RISK_CASH' | 'SIT_OUT';
   initialRationale: string;
-  revisedChoice?: 'LONG_MOMENTUM' | 'SHORT_HEDGE' | 'DE_RISK_CASH';
+  simulatedMargin?: number;
+  simulatedLeverage?: number;
+  previewCompleted?: boolean;
+  pollInfluence?: PollInfluenceOption;
+  revisedChoice?: 'LONG_MOMENTUM' | 'SHORT_HEDGE' | 'DE_RISK_CASH' | 'SIT_OUT';
   revisedRationale?: string;
   submittedAt: number;
   revisedAt?: number;
+  transactionRef?: string;
+  transactionStatus?: TransactionStatus;
+  simulatedOutcome?: 'PROFIT' | 'LOSS' | 'FLAT';
+  finalPnlSimulated?: number;
 }
 
 export interface MarketScenario {
@@ -96,19 +154,54 @@ export interface MarketScenario {
   catalystHeadline: string;
   surpriseEventHeadline: string;
   shockPrice: number;
-  decisions: Record<string, MemberDecision>; // Keyed by userId
+  decisions: Record<string, MemberDecision>;
+  transactions: Record<string, TransactionRecord>;
   phase: ScenarioPhase;
+  pollResults?: Partial<Record<PollInfluenceOption, number>>;
+}
+
+export interface FeedbackRecord {
+  userId: string;
+  costsWereClear: boolean | null;
+  understoodLiquidation: boolean | null;
+  confusingAspects: string;
+  submittedAt: number;
 }
 
 export interface GrowthMetrics {
+  // Observed demo telemetry
+  reservationCount: number;
+  attendeeCount: number;
+  completedCrews: number;
+  benefitsIssued: number;
+  eventCostINR: number;
+  previewCompletions: number;
+  simulatedDecisions: number;
+  unresolvedTransactions: number;
+  feedbackResponses: number;
+  // Growth loop stats
   invitationsSent: number;
   totalJoined: number;
   checkedInCount: number;
   teamsFormed: number;
   teamsQualified: number;
-  inviteToAttendanceRate: number; // e.g. 78.4%
-  teamCompletionRate: number;      // e.g. 68.2%
-  benefitUsageRate: number;        // e.g. 91.5%
-  repeatAttendanceRsvpRate: number;// e.g. 64.0%
-  costPerReturningTrader: number;  // $2.40 vs $28.00 traditional CAC
+  inviteToAttendanceRate: number;
+  teamCompletionRate: number;
+  benefitUsageRate: number;
+  repeatAttendanceRsvpRate: number;
+  costPerReturningTrader: number;
+}
+
+export interface FounderProjectionInputs {
+  eventsPerMonth: number;
+  capacityPerEvent: number;
+  attendanceRate: number;
+  newUserSharePct: number;
+  newToFirstTradePct: number;
+  monthlyRetentionPct: number;
+  serviceFeeINR: number;
+  eventCostPerSessionINR: number;
+  benefitCostPerCrewINR: number;
+  paidAcquisitionBudgetINR: number;
+  paidCACINR: number;
 }

@@ -2,12 +2,9 @@
  * MochaTrade Growth Model — Preset Scenarios
  * Baseline (paid-led, opaque) vs Recommended (Crew Pass + trust)
  * Per PRD §6.3 GRO-5
- * 
- * All values updated to INR per Round 1 deck numbers
  */
 
 import { ModelInputs, DEFAULT_TRUST_LEVERS, TrustLever } from './model';
-import { DECK_NUMBERS } from '../../config/deckNumbers';
 
 function disabledLevers(): TrustLever[] {
   return DEFAULT_TRUST_LEVERS.map((l) => ({ ...l, enabled: false, completeness: 0 }));
@@ -19,8 +16,8 @@ function fullLevers(): TrustLever[] {
 
 export const BASELINE_INPUTS: ModelInputs = {
   channel: {
-    paidBudgetInr: 100000,           // ₹100K/month paid budget (baseline = heavy paid spend)
-    paidCostPerSignup: DECK_NUMBERS.cac.paidMid,  // ₹1,350 midpoint
+    paidBudgetUsd: 5000,
+    paidCostPerSignup: 28,          // ASSUMED — industry $28 avg; sourced: MoEngage India Fintech 2024
     crewEventsPerMonth: 0,          // baseline = zero crew pass
     crewsPerEvent: 0,
     crewMembersPerCrew: 4,
@@ -32,32 +29,32 @@ export const BASELINE_INPUTS: ModelInputs = {
     inviteConversionRate: 0.05,
   },
   pricing: {
-    takerFeeBps: DECK_NUMBERS.pricing.takerFeeBaselineBps,  // 10 bps = higher opaque fee
+    takerFeeBps: 10,                // baseline = higher fee, opaque
     makerFeeBps: -2,
-    fxSpreadPct: DECK_NUMBERS.pricing.fxSpreadPct,
+    fxSpreadPct: 0.25,
     depositVolumeFractionOfNotional: 0.1,
   },
   trustLevers: disabledLevers(),
   trustRef: 0.5,
   priceElasticity: 0.7,
   trustElasticityDampening: 0.3,
-  baseVolumePerActiveInr: 150000,   // ₹1.5L/month per active trader
-  refFeeBps: DECK_NUMBERS.pricing.takerFeeRecommendedBps,
+  baseVolumePerActiveUsd: 2000,
+  refFeeBps: 5,
   funnelKyc: 0.65,
   funnelDeposit: 0.45,
   funnelFirstTrade: 0.55,
   funnelRetention: 0.40,
   supportTicketRatePerActivePerMonth: 0.15,
-  supportCostPerTicketInr: DECK_NUMBERS.supportCostPerTicket,
-  crewEventCostInr: DECK_NUMBERS.crewEventCost,
-  crewPerksCostInr: 0,
+  supportCostPerTicketUsd: 4.0,
+  crewEventCostUsd: 58,
+  crewPerksCostUsd: 0,
   months: 12,
 };
 
 export const RECOMMENDED_INPUTS: ModelInputs = {
   channel: {
-    paidBudgetInr: 40000,            // ₹40K/month (60% shifted to Crew Pass)
-    paidCostPerSignup: DECK_NUMBERS.cac.paidMid,  // ₹1,350 midpoint
+    paidBudgetUsd: 2000,            // 60% of paid budget shifted to crew
+    paidCostPerSignup: 28,          // ASSUMED — same CPA
     crewEventsPerMonth: 4,          // weekly Market Nights
     crewsPerEvent: 3,               // 3 crews per event
     crewMembersPerCrew: 4,
@@ -69,25 +66,25 @@ export const RECOMMENDED_INPUTS: ModelInputs = {
     inviteConversionRate: 0.12,
   },
   pricing: {
-    takerFeeBps: DECK_NUMBERS.pricing.takerFeeRecommendedBps,  // 2 bps = Round 1 deck 0.02%
-    makerFeeBps: -DECK_NUMBERS.pricing.rebateStructure.amountBps,  // -2 bps rebate
-    fxSpreadPct: DECK_NUMBERS.pricing.fxSpreadPct,
+    takerFeeBps: 5,                 // ASSUMED — competitive: match Dhan futures spread
+    makerFeeBps: -2,
+    fxSpreadPct: 0.25,
     depositVolumeFractionOfNotional: 0.1,
   },
   trustLevers: fullLevers(),
   trustRef: 0.5,
   priceElasticity: 0.7,
   trustElasticityDampening: 0.3,
-  baseVolumePerActiveInr: 150000,   // ₹1.5L/month per active trader
-  refFeeBps: DECK_NUMBERS.pricing.takerFeeRecommendedBps,
+  baseVolumePerActiveUsd: 2000,
+  refFeeBps: 5,
   funnelKyc: 0.65,
   funnelDeposit: 0.45,
   funnelFirstTrade: 0.55,
   funnelRetention: 0.40,
   supportTicketRatePerActivePerMonth: 0.15,
-  supportCostPerTicketInr: DECK_NUMBERS.supportCostPerTicket,
-  crewEventCostInr: DECK_NUMBERS.crewEventCost,
-  crewPerksCostInr: 100,           // ₹100/month crew perks per active crew user
+  supportCostPerTicketUsd: 4.0,
+  crewEventCostUsd: 58,
+  crewPerksCostUsd: 1.5,           // ASSUMED — crew perks per active crew user/mo
   months: 12,
 };
 

@@ -37,8 +37,8 @@ export interface TrustLever {
 }
 
 export interface ChannelInputs {
-  paidBudgetInr: number;          // monthly paid marketing spend (INR)
-  paidCostPerSignup: number;      // CPA on paid channel (INR)
+  paidBudgetUsd: number;          // monthly paid marketing spend
+  paidCostPerSignup: number;      // CPA on paid channel
   crewEventsPerMonth: number;     // Market Night events per month
   crewsPerEvent: number;          // avg crews per event
   crewMembersPerCrew: number;     // always 4
@@ -67,8 +67,8 @@ export interface ModelInputs {
   priceElasticity: number;
   /** trust's dampening of price elasticity (0..1) */
   trustElasticityDampening: number;
-  /** base monthly volume per active user (INR) */
-  baseVolumePerActiveInr: number;
+  /** base monthly volume per active user (USD) */
+  baseVolumePerActiveUsd: number;
   /** reference fee at which V0 was calibrated (bps) */
   refFeeBps: number;
   /** funnel conversion rates (baseline, before trust) */
@@ -78,11 +78,11 @@ export interface ModelInputs {
   funnelRetention: number;
   /** support cost */
   supportTicketRatePerActivePerMonth: number;
-  supportCostPerTicketInr: number;
-  /** event cost (food, venue etc) per event (INR) */
-  crewEventCostInr: number;
-  /** crew pass perks cost per active crew trader per month (INR) */
-  crewPerksCostInr: number;
+  supportCostPerTicketUsd: number;
+  /** event cost (food, venue etc) per event */
+  crewEventCostUsd: number;
+  /** crew pass perks cost per active crew trader per month */
+  crewPerksCostUsd: number;
   /** months to project */
   months: number;
 }
@@ -101,17 +101,17 @@ export interface MonthlySnapshot {
   firstTraded: number;
   // Stock
   activeUsers: number;
-  // Economics (INR)
-  volumeInr: number;
+  // Economics
+  volumeUsd: number;
   tradingRevenue: number;
   fxRevenue: number;
   totalRevenue: number;
   totalCost: number;
   contribution: number;
-  // KPIs (INR)
-  blendedCacInr: number;
-  paidCacInr: number;
-  crewCacInr: number;
+  // KPIs
+  blendedCacUsd: number;
+  paidCacUsd: number;
+  crewCacUsd: number;
   ltv: number;
   ltvCacRatio: number;
   paybackMonths: number;
@@ -142,7 +142,7 @@ export function buildAssumptionLedger(inputs: ModelInputs): AssumptionEntry[] {
       range: [1, 20],
       provenance: 'ASSUMED',
       confidence: 'MEDIUM',
-      source: 'Round 1 deck: 0.02% (2 bps) recommended, competitive vs Dhan/Zerodha',
+      source: 'Round 1 recommendation: competitive positioning vs Dhan/Zerodha',
     },
     {
       id: 'A-02',
@@ -197,9 +197,9 @@ export function buildAssumptionLedger(inputs: ModelInputs): AssumptionEntry[] {
     {
       id: 'A-07',
       label: 'Base volume per active user',
-      value: inputs.baseVolumePerActiveInr,
-      unit: 'INR/mo',
-      range: [50000, 500000],
+      value: inputs.baseVolumePerActiveUsd,
+      unit: 'USD/mo',
+      range: [500, 10000],
       provenance: 'ASSUMED',
       confidence: 'LOW',
       source: 'Round 1 estimate; replace with cohort data from beta',
@@ -247,22 +247,22 @@ export function buildAssumptionLedger(inputs: ModelInputs): AssumptionEntry[] {
     {
       id: 'A-12',
       label: 'Support cost per ticket',
-      value: inputs.supportCostPerTicketInr,
-      unit: 'INR',
-      range: [200, 600],
+      value: inputs.supportCostPerTicketUsd,
+      unit: 'USD',
+      range: [1, 20],
       provenance: 'ASSUMED',
       confidence: 'MEDIUM',
-      source: 'India ops: ₹300–400 per ticket estimated',
+      source: 'India ops: ~₹300–400 per ticket ≈ \$3.5–4.5 USD',
     },
     {
       id: 'A-13',
       label: 'Crew event cost',
-      value: inputs.crewEventCostInr,
-      unit: 'INR/event',
-      range: [3000, 10000],
+      value: inputs.crewEventCostUsd,
+      unit: 'USD/event',
+      range: [50, 500],
       provenance: 'ASSUMED',
       confidence: 'MEDIUM',
-      source: 'Round 1 deck: virtual event ≈ ₹5000; in-person higher',
+      source: 'Round 1: virtual event ≈ ₹5000 (\$58); in-person higher',
     },
     {
       id: 'A-14',
@@ -363,10 +363,10 @@ export function runModel(inputs: ModelInputs): ModelOutput {
   const {
     channel, pricing, trustLevers, trustRef,
     priceElasticity, trustElasticityDampening,
-    baseVolumePerActiveInr, refFeeBps,
+    baseVolumePerActiveUsd, refFeeBps,
     funnelKyc, funnelDeposit, funnelFirstTrade, funnelRetention,
-    supportTicketRatePerActivePerMonth, supportCostPerTicketInr,
-    crewEventCostInr, months,
+    supportTicketRatePerActivePerMonth, supportCostPerTicketUsd,
+    crewEventCostUsd, months,
   } = inputs;
 
   const warnings: string[] = [];
@@ -399,7 +399,10 @@ export function runModel(inputs: ModelInputs): ModelOutput {
   const adjKyc = trustAdjust(funnelKyc, avgBetaKyc);
   const adjDeposit = trustAdjust(funnelDeposit, avgBetaDeposit);
   // PRD §6.1: "price must also hit activation and retention... needs an interior optimum"
-  const feeRatio = pricing.takerFeeBps / refFeeBps;
+  // Guard: clamp feeRatio so zero fee never produces NaN from Math.pow(0, -ε).
+  // Zero trading revenue is already ensured by the revenue formula: volume × 0 bps = 0.
+  const rawFeeRatio = refFeeBps > 0 ? pricing.takerFeeBps / refFeeBps : 1;
+  const feeRatio = Math.max(0.01, rawFeeRatio); // floor at 1% of reference fee
   // High fees deter first-trade activation:
   const feeActivationPenalty = feeRatio > 1 ? Math.min(0.8, 0.25 * (feeRatio - 1)) : 0;
   const adjFirstTrade = Math.max(0.05, trustAdjust(funnelFirstTrade, avgBetaFirstTrade) * (1 - feeActivationPenalty));
@@ -411,10 +414,12 @@ export function runModel(inputs: ModelInputs): ModelOutput {
 
   // ── Price elasticity (trust dampens sensitivity) ──────────────────────────
   const effectiveElasticity = priceElasticity * (1 - trustElasticityDampening * trustScore);
-  const volumeMultiplier = Math.pow(feeRatio, -effectiveElasticity);
+  const volumeMultiplier = Number.isFinite(Math.pow(feeRatio, -effectiveElasticity))
+    ? Math.pow(feeRatio, -effectiveElasticity) : 1;
 
   // ── LTV (steady-state) ────────────────────────────────────────────────────
-  const arpu = baseVolumePerActiveInr * volumeMultiplier * (pricing.takerFeeBps / 10000);
+  // When takerFeeBps = 0, arpu = 0 and LTV = 0 — valid, no NaN.
+  const arpu = baseVolumePerActiveUsd * volumeMultiplier * (pricing.takerFeeBps / 10000);
   const ltv = adjRetention < 1 ? arpu / (1 - adjRetention) : arpu * 12;
 
   let activeUsers = 0;
@@ -423,7 +428,7 @@ export function runModel(inputs: ModelInputs): ModelOutput {
 
   for (let m = 1; m <= months; m++) {
     // ── Inflows ──────────────────────────────────────────────────────────────
-    const paidSignups = channel.paidBudgetInr / channel.paidCostPerSignup;
+    const paidSignups = channel.paidBudgetUsd / channel.paidCostPerSignup;
     const crewSignups = channel.crewEventsPerMonth * channel.crewsPerEvent *
       channel.crewMembersPerCrew * channel.crewJoinRate * channel.crewNewPlatformShare;
     const organicSignups = channel.organicBaseMonthly * Math.pow(1 + channel.organicGrowthRate, m - 1);
@@ -438,19 +443,19 @@ export function runModel(inputs: ModelInputs): ModelOutput {
     // ── Stock (cohort retention) ──────────────────────────────────────────────
     activeUsers = activeUsers * adjRetention + firstTraded;
 
-    // ── Volume & Revenue (INR) ────────────────────────────────────────────────
-    const volumeInr = activeUsers * baseVolumePerActiveInr * volumeMultiplier;
-    const tradingRevenue = volumeInr * (pricing.takerFeeBps / 10000);
-    const fxRevenue = deposited * 10000 * (pricing.fxSpreadPct / 100); // estimated deposit size ₹10,000
+    // ── Volume & Revenue ──────────────────────────────────────────────────────
+    const volumeUsd = activeUsers * baseVolumePerActiveUsd * volumeMultiplier;
+    const tradingRevenue = volumeUsd * (pricing.takerFeeBps / 10000);
+    const fxRevenue = deposited * 500 * (pricing.fxSpreadPct / 100); // estimated deposit size \$500
     const totalRevenue = tradingRevenue + fxRevenue;
 
-    // ── Costs (INR) ───────────────────────────────────────────────────────────
+    // ── Costs ─────────────────────────────────────────────────────────────────
     const ticketReduction = avgBetaTickets * trustScore;
     const effectiveTicketRate = supportTicketRatePerActivePerMonth * (1 - ticketReduction);
-    const supportCost = activeUsers * effectiveTicketRate * supportCostPerTicketInr;
-    const eventCost = channel.crewEventsPerMonth * crewEventCostInr;
-    const crewPerksCost = activeUsers * (inputs.crewPerksCostInr || 0);
-    const totalCost = channel.paidBudgetInr + eventCost + crewPerksCost + supportCost;
+    const supportCost = activeUsers * effectiveTicketRate * supportCostPerTicketUsd;
+    const eventCost = channel.crewEventsPerMonth * crewEventCostUsd;
+    const crewPerksCost = activeUsers * (inputs.crewPerksCostUsd || 0);
+    const totalCost = channel.paidBudgetUsd + eventCost + crewPerksCost + supportCost;
 
     const contribution = totalRevenue - totalCost;
     cumulativeContribution += contribution;
@@ -459,11 +464,11 @@ export function runModel(inputs: ModelInputs): ModelOutput {
       breakevenMonth = m;
     }
 
-    // ── CAC (derived, INR) ────────────────────────────────────────────────────
-    const paidCac = paidSignups > 0 ? channel.paidBudgetInr / paidSignups : Infinity;
+    // ── CAC (derived) ─────────────────────────────────────────────────────────
+    const paidCac = paidSignups > 0 ? channel.paidBudgetUsd / paidSignups : Infinity;
     const crewCost = eventCost + crewPerksCost;
     const crewCac = crewSignups > 0 ? crewCost / crewSignups : Infinity;
-    const blendedCac = totalSignups > 0 ? (channel.paidBudgetInr + crewCost) / totalSignups : Infinity;
+    const blendedCac = totalSignups > 0 ? (channel.paidBudgetUsd + crewCost) / totalSignups : Infinity;
 
     const ltvCacRatio = blendedCac > 0 && blendedCac < Infinity ? ltv / blendedCac : 0;
     const paybackMonths = arpu > 0 && blendedCac < Infinity ? blendedCac / arpu : 999;
@@ -479,15 +484,15 @@ export function runModel(inputs: ModelInputs): ModelOutput {
       deposited: Math.round(deposited),
       firstTraded: Math.round(firstTraded),
       activeUsers: Math.round(activeUsers),
-      volumeInr,
+      volumeUsd,
       tradingRevenue,
       fxRevenue,
       totalRevenue,
       totalCost,
       contribution,
-      blendedCacInr: blendedCac < Infinity ? blendedCac : 0,
-      paidCacInr: paidCac < Infinity ? paidCac : 0,
-      crewCacInr: crewCac < Infinity ? crewCac : 0,
+      blendedCacUsd: blendedCac < Infinity ? blendedCac : 0,
+      paidCacUsd: paidCac < Infinity ? paidCac : 0,
+      crewCacUsd: crewCac < Infinity ? crewCac : 0,
       ltv,
       ltvCacRatio,
       paybackMonths: paybackMonths > 120 ? 120 : paybackMonths,
@@ -579,4 +584,7 @@ export function sensitivityTornado(inputs: ModelInputs): SensitivityPoint[] {
     };
   }).sort((a, b) => b.swing - a.swing);
 }
+
+// ─── Market Night Trust & Growth Funnel (Re-export) ──────────────────────────
+export * from './trustFunnelModel';
 
