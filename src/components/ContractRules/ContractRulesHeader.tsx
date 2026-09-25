@@ -32,24 +32,10 @@ export const ContractRulesHeader: React.FC<HeaderProps> = ({
   const isFeedLive = quote.status === 'live';
 
   return (
-    <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md sticky top-0 z-40">
+    <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur-md relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          {/* Logo and Brand */}
-          <div className="flex items-center space-x-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20">
-              <Flame className="h-6 w-6 text-slate-950 stroke-[2.5]" />
-            </div>
-            <div>
-              <div className="flex items-center space-x-2">
-                <span className="font-extrabold text-xl tracking-tight text-white">Mocha<span className="text-amber-400">Trade</span></span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-300 border border-amber-500/30">
-                  PROTOTYPE • 3
-                </span>
-              </div>
-              <p className="text-xs text-slate-400 hidden sm:block">Scalability through Validated Contract Rules</p>
-            </div>
-          </div>
+          <h1 className="text-xl font-medium">Contract studio</h1>
 
           {/* Contract Switcher */}
           <div className="flex items-center space-x-2 bg-slate-950/80 p-1.5 rounded-xl border border-slate-800">
