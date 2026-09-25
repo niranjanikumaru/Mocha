@@ -164,44 +164,7 @@ export default function MarketNightPage() {
       <RetroGrid opacity={0.3} cellSize={65} lineColor="rgba(245, 158, 11, 0.12)" />
 
       {/* ── Top Bar ── */}
-      <header className="h-[52px] px-5 bg-[var(--bg-surface)]/80 backdrop-blur-md border-b border-[var(--border)] flex items-center justify-between z-20 shrink-0">
-        <div className="flex items-center gap-4">
-          <Link
-            href="/"
-            className="flex items-center gap-1.5 text-[12px] text-[var(--text-secondary)] hover:text-white transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            <span>Trading Terminal</span>
-          </Link>
-
-          <Link
-            href="/contract-rules"
-            className="hidden sm:flex items-center gap-1.5 text-[12px] text-amber-400 hover:text-amber-300 transition-colors"
-          >
-            <Shield className="w-3.5 h-3.5" />
-            <span>Contract Rules</span>
-          </Link>
-
-          <div className="w-px h-4 bg-[var(--border)] hidden sm:block" />
-
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md bg-[var(--brand)] flex items-center justify-center">
-              <Zap className="w-3.5 h-3.5 text-black" strokeWidth={2.5} />
-            </div>
-            <span className="font-bold text-[14px] text-[var(--text-primary)]">Mocha Market Night</span>
-            <span className="badge badge-brand text-[9px] uppercase tracking-wider">Crew Pass Prototype</span>
-          </div>
-        </div>
-
-        {/* User Pill */}
-        <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 px-2.5 py-1 bg-[var(--bg-interactive)] border border-[var(--border)] rounded-lg text-[12px]">
-            <span>{currentUser.avatar}</span>
-            <span className="font-semibold text-[var(--text-primary)]">{currentUser.name}</span>
-            <span className="badge badge-muted text-[9px]">{currentUser.id === 'usr-01' ? 'Captain' : 'Trader'}</span>
-          </div>
-        </div>
-      </header>
+      <div className="premium-page-heading"><span>THE COMMUNITY EXPERIENCE</span><h1>Better, together.</h1><p>Mocha Market Night · {currentUser.name} · {currentUser.id === 'usr-01' ? 'Crew captain' : 'Trader'}</p></div>
 
       {/* ── Secondary Stage Nav Strip ── */}
       <div className="bg-[var(--bg-elevated)] border-b border-[var(--border)] px-5 py-2 flex flex-wrap items-center justify-between gap-3 text-[12px]">
