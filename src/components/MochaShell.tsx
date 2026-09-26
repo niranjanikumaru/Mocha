@@ -3,8 +3,10 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
 import AppDock from './AppDock';
+import { usePathname } from 'next/navigation';
 
 export default function MochaShell({ children }: { children: ReactNode }) {
+  const entry = usePathname() === '/';
   const [intro, setIntro] = useState(true);
   const reduced = useReducedMotion();
   useEffect(() => {
@@ -23,8 +25,8 @@ export default function MochaShell({ children }: { children: ReactNode }) {
     <>
       <div inert={intro} className="premium-app">
         <a className="premium-skip" href="#mocha-content">Skip to content</a>
-        <AppDock />
-        <div id="mocha-content" tabIndex={-1} className="mocha-page-content">{children}</div>
+        {!entry && <AppDock />}
+        <div id="mocha-content" tabIndex={-1} className="mocha-page-content" style={entry ? { paddingTop: 0 } : undefined}>{children}</div>
       </div>
       <AnimatePresence>
         {intro && (

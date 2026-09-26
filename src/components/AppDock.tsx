@@ -7,7 +7,7 @@ import { motion, useMotionValue, useSpring, useTransform, useReducedMotion, type
 import { BarChart3, Layers, TrendingUp, Users, ShieldCheck, Beaker } from 'lucide-react';
 
 const destinations = [
-  { href: '/', label: 'Overview', icon: BarChart3, aliases: [] },
+  { href: '/studio', label: 'Overview', icon: BarChart3, aliases: [] },
   { href: '/trust-funnel', label: 'Growth', icon: Layers, aliases: [] },
   { href: '/proof/terminal', label: 'Terminal', icon: TrendingUp, aliases: [] },
   { href: '/market-night', label: 'Market Night', icon: Users, aliases: ['/proof/market-night'] },
